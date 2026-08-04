@@ -3217,17 +3217,17 @@
         "review_WWb6xh": {
           "type": "review",
           "settings": {
-            "quote": "Incredible customer service and high-quality sustainable stencils. They helped us organize all of our pavement markings layouts effortlessly.",
+            "quote": "Thank you for making this process easy and streamlined! We use several other packaging vendors that struggle to provide the superior service and attention to detail that Sana Packaging provides.",
             "logo": "shopify://shop_images/bask_fd411d7d-1c9e-4d32-8c5d-549f0ff2ea96.webp",
-            "brand_name": "CNA"
+            "brand_name": "Bask"
           }
         },
         "review_zgaUnt": {
           "type": "review",
           "settings": {
-            "quote": "The stencils are extremely durable and simple to align. Perfect outcome on every job. We highly recommend their custom products.",
+            "quote": "We have been looking at Sana Packaging since we began our business in 2019. It's been wonderful to watch both companies grow (pun intended) and it’s been an honor to partner with Sana Packaging for our packaging needs.",
             "logo": "shopify://shop_images/cna_85d55ada-15df-46c2-8baf-5cf1f7c7efe0.webp",
-            "brand_name": "RedWood"
+            "brand_name": "CNA"
           }
         },
         "review_QWA9in": {
@@ -4138,7 +4138,7 @@
         "image_mobile": "shopify://shop_images/newsletter-cta-bg-mobile.jpg",
         "overlap": 80,
         "section_width": "page-width",
-        "background_color": "#FFFFFF",
+        "background_color": "#ffffff",
         "padding-block-start": 0,
         "padding-block-end": 64,
         "use_mobile_padding": true,
