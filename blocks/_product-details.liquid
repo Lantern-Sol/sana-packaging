@@ -169,6 +169,51 @@
     grid-column: 1 / -1;
   }
 
+  /* The 114px colour track is drawn for the two-value swatch option in Figma 2144:275 — it is
+     exactly two 52px tiles and the 10px gap between them. An option with more values than that
+     wraps inside the track instead, and past four values it stops reading as a swatch row at
+     all: ten values come out as two columns of five, which is a vertical list, not a picker.
+
+     So from the third value on, the picker takes the whole row and the other two controls drop
+     to the row below, where the values run across as one horizontal band. The track list is
+     restated rather than left alone so quantity and price keep the exact widths the design
+     gives them (94 and 240) instead of inheriting the colour track's 114 — the trailing 114fr
+     is the leftover, kept as an fr so the row still scales down with the details column the way
+     the three-control row does. Two values or fewer keep the Figma layout untouched. */
+  .product-details
+    .group-block-content:has(> .buy-buttons-block):has(
+      .variant-option--swatches .variant-option__button-label:nth-of-type(3)
+    ) {
+    grid-template-columns: minmax(0, 94fr) minmax(0, 240fr) minmax(0, 114fr);
+  }
+
+  .product-details
+    .group-block-content:has(> .buy-buttons-block):has(
+      .variant-option--swatches .variant-option__button-label:nth-of-type(3)
+    )
+    > variant-picker {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .product-details
+    .group-block-content:has(> .buy-buttons-block):has(
+      .variant-option--swatches .variant-option__button-label:nth-of-type(3)
+    )
+    .product-form__quantity-col {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .product-details
+    .group-block-content:has(> .buy-buttons-block):has(
+      .variant-option--swatches .variant-option__button-label:nth-of-type(3)
+    )
+    .product-form__price-col {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
   /* --- Field labels (Color: / Quantity: / Price:) -------------------------- */
 
   /* Figma "UI/Label/Defult" 18/600/1.25 with a 14/400/1.5 sub-line, and the control
@@ -588,6 +633,35 @@
     .product-details .group-block-content:has(> .buy-buttons-block) .product-form__price-col {
       grid-column: 1 / -1;
       grid-row: 2;
+    }
+
+    /* Same breakout as desktop — see the note on the three-control row. Restated rather than
+       inherited because the desktop rules carry the extra `:has()` and would otherwise outrank
+       the two mobile rules above: mobile keeps the colour track's values full width, then
+       quantity on its own row at the Figma 94, then price and Add to Cart spanning below. */
+    .product-details
+      .group-block-content:has(> .buy-buttons-block):has(
+        .variant-option--swatches .variant-option__button-label:nth-of-type(3)
+      ) {
+      grid-template-columns: 94px minmax(0, 1fr);
+    }
+
+    .product-details
+      .group-block-content:has(> .buy-buttons-block):has(
+        .variant-option--swatches .variant-option__button-label:nth-of-type(3)
+      )
+      .product-form__quantity-col {
+      grid-column: 1;
+      grid-row: 2;
+    }
+
+    .product-details
+      .group-block-content:has(> .buy-buttons-block):has(
+        .variant-option--swatches .variant-option__button-label:nth-of-type(3)
+      )
+      .product-form__price-col {
+      grid-column: 1 / -1;
+      grid-row: 3;
     }
 
     /* Mobile drops the label-to-control offset from 72px to 55px. */
