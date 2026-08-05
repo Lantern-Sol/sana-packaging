@@ -8,6 +8,7 @@
   @param {string} [style_class] - Button style class: 'button' (primary) or 'button-secondary'. Defaults to 'button'.
   @param {boolean} [show_icon] - Whether to render the cart icon. Defaults to true.
   @param {string} [add_to_cart_text] - Overrides the Add button label. Defaults to the `actions.add` translation.
+  @param {boolean} [force_add] - Uses the selected or first available variant for a direct add action.
 {%- enddoc -%}
 
 {% liquid
@@ -38,6 +39,9 @@
 
   assign quick_add_button = 'choose'
   if product.variants_count == 1 or product.options.size == 1 and product.selected_variant
+    assign quick_add_button = 'add'
+  endif
+  if force_add
     assign quick_add_button = 'add'
   endif
 %}

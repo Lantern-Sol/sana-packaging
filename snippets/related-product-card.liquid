@@ -1,0 +1,182 @@
+{%- doc -%}
+  Renders one card of the Sana "Related Products" section.
+
+  Figma: desktop card 2123:474, mobile card 2123:1897 (Sana Website 2026).
+  The title and the "View Product" affordance sit INSIDE the media, over a
+  multiply scrim; the quantity stepper and Add to Cart sit on the card's own
+  Teal/800 surface below it.
+
+  Layout and type live in the owning section's stylesheet so the card and the
+  carousel share one set of rem values — see sections/related-products.liquid.
+
+  @param {object} [product] - The product to render. Blank renders an onboarding placeholder card.
+  @param {string} section_id - The owning section id, used by the add-to-cart form.
+  @param {number} [index] - Zero-based position in the list, used to build a unique form id.
+  @param {string} [view_label] - Label shown beneath the card title. Defaults to "View Product".
+  @param {string} [add_label] - Add to cart label. Defaults to "Add to Cart".
+
+  @example
+  {% render 'related-product-card', product: product, section_id: section.id, index: forloop.index0 %}
+{%- enddoc -%}
+
+{%- liquid
+  assign view_label = view_label | default: 'View Product'
+  assign add_label = add_label | default: 'Add to Cart'
+
+  assign variant = product.selected_or_first_available_variant
+  assign product_url = variant.url | default: product.url
+
+  assign can_add_to_cart = false
+  if variant.available
+    assign can_add_to_cart = true
+  endif
+
+  if product != blank and can_add_to_cart == false
+    if variant == blank
+      assign add_label = 'products.product.unavailable' | t
+    else
+      assign add_label = 'products.product.sold_out' | t
+    endif
+  endif
+
+  assign media_alt = product.featured_media.alt | default: product.title
+  assign form_id = 'RelatedProducts-' | append: section_id | append: '-' | append: product.id | append: '-' | append: index
+-%}
+
+<article class="related-card{% if product == blank %} related-card--placeholder{% endif %}">
+  <div class="related-card__media">
+    {%- if product.featured_media != blank -%}
+      {{
+        product.featured_media
+        | image_url: width: 1032
+        | image_tag:
+          loading: 'lazy',
+          class: 'related-card__image',
+          widths: '344, 516, 688, 1032',
+          sizes: '(min-width: 750px) 24vw, 83vw',
+          alt: media_alt
+      }}
+    {%- else -%}
+      <span class="related-card__image related-card__image--placeholder">
+        {{- 'product-apparel-1' | placeholder_svg_tag -}}
+      </span>
+    {%- endif -%}
+
+    <span
+      class="related-card__scrim"
+      aria-hidden="true"
+    ></span>
+
+    <div class="related-card__meta">
+      <h3 class="related-card__title">
+        {%- if product == blank -%}
+          {{- 'placeholders.product_title' | t -}}
+        {%- else -%}
+          <a
+            class="related-card__link"
+            href="{{ product_url }}"
+          >
+            {{- product.title | escape -}}
+          </a>
+        {%- endif -%}
+      </h3>
+
+      {%- comment -%}
+        Decorative. The whole media is already the product link (the stretched
+        ::after on .related-card__link), so exposing this as a second link to the
+        same URL would only add noise for assistive tech.
+      {%- endcomment -%}
+      <span
+        class="related-card__view"
+        aria-hidden="true"
+      >
+        {{- view_label -}}
+      </span>
+    </div>
+  </div>
+
+  {%- comment -%}
+    `data-slideshow-no-drag` keeps the card's controls out of the carousel's drag gesture.
+    The card sits in a slideshow slide, and slideshow.js otherwise starts a drag from any
+    mousedown inside the track — which cancels the click on the quantity chevrons and on
+    Add to Cart. See NON_DRAGGABLE_SELECTOR in assets/slideshow.js.
+  {%- endcomment -%}
+  {%- if product == blank -%}
+    <div
+      class="related-card__actions"
+      data-slideshow-no-drag
+    >
+      <div class="related-card__buy">
+        <span class="related-card__quantity related-card__quantity--static">
+          <span class="related-card__quantity-value">1</span>
+        </span>
+        <span class="button related-card__atc">{{ add_label }}</span>
+      </div>
+    </div>
+  {%- else -%}
+    <product-form-component
+      class="related-card__actions"
+      data-slideshow-no-drag
+      data-section-id="{{ section_id }}"
+      data-product-id="{{ product.id }}"
+      data-product-url="{{ product_url }}"
+      data-quantity-default="{{ variant.quantity_rule.min | default: 1 }}"
+      data-quantity-error-max="{{ 'products.product.quantity_error_max' | t }}"
+      on:submit="/handleSubmit"
+    >
+      <div
+        class="visually-hidden"
+        aria-live="assertive"
+        role="status"
+        aria-atomic="true"
+        ref="liveRegion"
+      ></div>
+
+      {%- form 'product', product, id: form_id, novalidate: 'novalidate', data-type: 'add-to-cart-form' -%}
+        <input
+          type="hidden"
+          name="id"
+          ref="variantId"
+          value="{{ variant.id }}"
+          {% if can_add_to_cart == false %}
+            disabled
+          {% endif %}
+        >
+
+        <div class="related-card__buy">
+          {% render 'quantity-selector',
+            product: product,
+            class: 'related-card__quantity',
+            wrapper_class: 'related-card__quantity-wrapper',
+            stepper_style: 'chevron',
+            can_update_quantity: can_add_to_cart
+          %}
+
+          {%- comment -%}
+            `add-to-cart-button` is what gates the checkmark-burst reveal in base.css
+            (.add-to-cart-button[data-added='true'] .checkmark-burst). The label's
+            slide-out is NOT gated, so without the class the button empties itself on
+            add and nothing takes the label's place.
+          {%- endcomment -%}
+          {% render 'add-to-cart-button',
+            can_add_to_cart: can_add_to_cart,
+            add_to_cart_text: add_label,
+            product: product,
+            class: 'related-card__atc add-to-cart-button',
+            style_class: 'button',
+            show_icon: false
+          %}
+        </div>
+
+        <span
+          class="related-card__error hidden"
+          ref="addToCartTextError"
+        >
+          <span class="svg-wrapper">
+            {{- 'icon-error.svg' | inline_asset_content -}}
+          </span>
+        </span>
+      {%- endform -%}
+    </product-form-component>
+  {%- endif -%}
+</article>

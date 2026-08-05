@@ -1,0 +1,117 @@
+{%- doc -%}
+  Shared styles for the bordered data tables inside the PDP accordion —
+  Figma "Price Table" (2123:360) and "Spec Table" (2123:417).
+
+  Both tables are built from the same Figma `Cell` component, so the geometry,
+  colours and zebra rhythm live here once and each block only picks an
+  alignment modifier. Rendered by `blocks/product-price-table.liquid` and
+  `blocks/product-specs-table.liquid`.
+
+  @example
+  {% render 'product-data-table-styles' %}
+{%- enddoc -%}
+
+{% stylesheet %}
+  /* Figma: 1px Sand/200 border, 16px radius, white fill. `separate` + `overflow: hidden`
+     keeps the radius clipping the corner cells; `collapse` would drop the radius. */
+  .product-data-table {
+    width: 100%;
+    border: 1px solid #e6d7c3;
+    border-radius: 16px;
+    border-collapse: separate;
+    border-spacing: 0;
+    overflow: hidden;
+    color: #064c4d;
+    background: #fff;
+    font-family: var(--font-body--family);
+    table-layout: fixed;
+  }
+
+  /* Body cell — Body/Default/Regular (16/400/1.5), 12px/16px padding. */
+  .product-data-table :is(th, td) {
+    padding: 12px 16px;
+    border-bottom: 1px solid #e6d7c3;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.5;
+    vertical-align: middle;
+    overflow-wrap: anywhere;
+  }
+
+  /* Header cell — Body/SM/SemiBold (14/600/1.5) on Sand/100. */
+  .product-data-table thead th {
+    background: #f3ebe1;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  /* Zebra starts on the second body row, matching the Figma cell stack. */
+  .product-data-table tbody tr:nth-child(even) :is(th, td) {
+    background: rgb(247 241 235 / 0.5);
+  }
+
+  .product-data-table tbody tr:last-child :is(th, td) {
+    border-bottom: 0;
+  }
+
+  .product-data-table--center :is(th, td) {
+    text-align: center;
+  }
+
+  .product-data-table--pairs :is(th, td) {
+    text-align: left;
+  }
+
+  /* Figma spec table columns: 218 / 289 of 507. */
+  .product-data-table--pairs :is(th, td):first-child {
+    width: 43%;
+  }
+
+  /* Figma "Ghost / Hyper link button" (2123:438) — UI/Button/Small with a 16px glyph. */
+  .product-data-table__doc-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 24px;
+    color: #064c4d;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: normal;
+    letter-spacing: 0.02em;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    transition: opacity var(--animation-speed) var(--animation-easing);
+  }
+
+  .product-data-table__doc-link:hover {
+    opacity: 0.7;
+  }
+
+  .product-data-table__doc-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+  }
+
+  .product-data-table__doc-icon svg {
+    display: block;
+    width: 16px;
+    height: 16px;
+  }
+
+  @media screen and (max-width: 749px) {
+    .product-data-table :is(th, td) {
+      padding: 12px 10px;
+      font-size: 14px;
+    }
+
+    .product-data-table thead th {
+      font-size: 13px;
+    }
+
+    .product-data-table--pairs :is(th, td):first-child {
+      width: 50%;
+    }
+  }
+{% endstylesheet %}

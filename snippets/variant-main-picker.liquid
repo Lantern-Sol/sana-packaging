@@ -58,6 +58,8 @@
     <form class="variant-picker__form">
       {%- for product_option in product_resource.options_with_values -%}
         {%- liquid
+          assign product_option_name_downcase = product_option.name | downcase
+          assign product_option_name_handle = product_option.name | handleize
           assign swatch_count = product_option.values | map: 'swatch' | compact | size
           assign variant_style = block_settings.variant_style
 
@@ -67,6 +69,22 @@
             else
               assign variant_style = 'swatch'
             endif
+          endif
+
+          # Fall back to the option values' variant images when no swatch is configured in the
+          # admin. Opt-in, because it turns text pills into image tiles wherever it applies —
+          # the Sana PDP colour picker (Figma 2144:278) is built on those tiles.
+          assign use_variant_image_swatch = false
+          if block_settings.image_swatches and swatch_count == 0 and variant_style != 'swatch'
+            for option_value in product_option.values
+              if option_value.variant.featured_media != blank
+                assign use_variant_image_swatch = true
+                break
+              endif
+            endfor
+          endif
+          if use_variant_image_swatch
+            assign variant_style = 'swatch'
           endif
 
           if variant_style == 'buttons' and settings.variant_button_width == 'equal-width-buttons'
@@ -95,13 +113,17 @@
             assign default_value_at_position = default_variant.options[default_option_index]
           -%}
           <fieldset
-            class="variant-option variant-option--buttons{% if variant_style == 'swatch' %} variant-option--swatches{% else %} variant-option--{{ settings.variant_button_width }}{% endif %}"
+            class="variant-option variant-option--{{ product_option_name_handle }} variant-option--buttons{% if variant_style == 'swatch' %} variant-option--swatches{% else %} variant-option--{{ settings.variant_button_width }}{% endif %}"
             data-fieldset-index="{{ fieldset_index }}"
             ref="fieldsets[]"
             {{ option_id_attribute }}
           >
             <legend>
-              {{ product_option.name | escape -}}
+              {%- comment -%}
+                The name is wrapped so a surface can decorate it independently of the selected
+                value that follows — the Sana PDP appends a colon to it (Figma 2144:277).
+              {%- endcomment -%}
+              <span class="variant-option__name">{{ product_option.name | escape }}</span>
               {%- if variant_style == 'swatch' -%}
                 <span class="variant-option__swatch-value">{{ product_option.selected_value }}</span>
               {%- endif %}
@@ -160,6 +182,7 @@
                   {% render 'swatch',
                     swatch: product_option_value.swatch,
                     variant_image: featured_media,
+                    force_variant_image: use_variant_image_swatch,
                     mode: 'unscaled'
                   %}
                 {% else %}
@@ -185,6 +208,20 @@
                   --variant-ch: {{ longest_value | times: 0.65 }}em;
                 }
               {% endstyle %}
+            {% endif %}
+            {% if product_option_name_downcase == 'price' %}
+              {% liquid
+                assign picker_units_per_case = product_resource.metafields.custom.units_per_case.value | plus: 0
+                if picker_units_per_case <= 0
+                  assign picker_units_per_case = 1000
+                endif
+                assign picker_case_price = default_variant.price
+                assign picker_unit_price = picker_case_price | divided_by: picker_units_per_case
+              %}
+              <div class="variant-option__price-summary" aria-live="polite">
+                <span>Price Per Unit:</span>
+                <strong>{{ picker_unit_price | money }}</strong>
+              </div>
             {% endif %}
           </fieldset>
           {%- assign fieldset_index = fieldset_index | plus: 1 -%}
@@ -285,3 +322,19 @@
 {% endunless %}
 
 {% render 'variant-picker-styles' %}
+
+{% stylesheet %}
+  .variant-option__price-summary {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 8px;
+    padding: 4px 8px;
+    color: #064c4d;
+    background: #f0fdfa;
+    font-size: 12px;
+    line-height: 21px;
+  }
+
+  .variant-option__price-summary strong { font-weight: 500; }
+{% endstylesheet %}

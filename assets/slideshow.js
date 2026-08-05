@@ -16,6 +16,17 @@ import { SlideshowSelectEvent } from '@theme/events';
 const SLIDE_VISIBLITY_THRESHOLD = 0.7;
 
 /**
+ * Regions inside a slide that are click targets rather than drag handles.
+ *
+ * Starting a drag on one of these breaks it outright: the pointer capture taken on the
+ * first pointermove moves :hover off the pressed control and onto the slideshow, and the
+ * click that would have activated it is cancelled. A single pixel of travel while a button
+ * is held is enough. Sections opt a subtree out with the `data-slideshow-no-drag` attribute;
+ * `.card-media-actions` predates it and is kept so the product card gallery stays covered.
+ */
+const NON_DRAGGABLE_SELECTOR = '[data-slideshow-no-drag], .card-media-actions';
+
+/**
  * Shared viewport observer manager for lazy scroll enablement.
  *
  * Limit the number of compositor layers created by slideshows by only enabling scrolling when the slideshow is in the viewport.
@@ -702,13 +713,10 @@ export class Slideshow extends Component {
       return;
     }
 
-    // The actions layered over a product card's media are click targets, not drag handles.
-    // Starting a drag here calls setPointerCapture below, and a captured pointer moves :hover
-    // off the element underneath and onto the capturing slideshow — so the card stops matching
-    // :hover, its action row retracts out from under the cursor mid-press, and the release lands
-    // on the media instead of the button. The click then resolves to a common ancestor and the
-    // add never submits. A single pixel of travel while the button is held is enough to trigger it.
-    if (event.target.closest('.card-media-actions')) {
+    // Buy rows, quantity steppers and the actions layered over a product card's media are
+    // click targets, not drag handles — see NON_DRAGGABLE_SELECTOR. Bail before preventDefault
+    // so the press behaves like a press on any ordinary button.
+    if (event.target.closest(NON_DRAGGABLE_SELECTOR)) {
       return;
     }
 

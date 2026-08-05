@@ -23,6 +23,29 @@
   {% endstyle %}
 {% endif %}
 
+{%- liquid
+  comment
+    The trailing icon defaults to the arrow so every button saved before icon_style
+    existed keeps the glyph it already had.
+
+    icon-arrow-top-right.svg draws a 12px glyph inside a padded 24px viewBox, so its
+    mask is pinned to 24px and the 15px box crops the padding away. icon-download.svg
+    fills its 18px viewBox edge to edge, so it is masked and boxed at its native size —
+    the 18px the design calls for.
+  endcomment
+
+  assign icon_style = block_settings.icon_style | default: 'arrow'
+  if icon_style == 'download'
+    assign icon_url = 'icon-download.svg' | asset_url
+    assign icon_box = 18
+    assign icon_mask_size = '18px 18px'
+  else
+    assign icon_url = 'icon-arrow-top-right.svg' | asset_url
+    assign icon_box = 15
+    assign icon_mask_size = '24px 24px'
+  endif
+-%}
+
 {% if block_settings.pill or block_settings.show_arrow_icon %}
   {% style %}
     {% if block_settings.pill %}
@@ -36,26 +59,42 @@
         align-items: center;
         justify-content: center;
         gap: 10px;
+        {%- comment -%}
+          Every Figma button component sets the label to nowrap. It matters most here:
+          once the label breaks over two lines the trailing icon is left stranded beside
+          a stack of text, which is never what the icon variant is drawn as.
+        {%- endcomment -%}
+        white-space: nowrap;
       }
 
       .{{ block_settings.style_class }}.{{ block_settings.style_class }}--{{ block_id }}::after {
         content: '';
         flex-shrink: 0;
-        width: 15px;
-        height: 15px;
+        width: {{ icon_box }}px;
+        height: {{ icon_box }}px;
         background-color: currentcolor;
-        mask: url('{{ 'icon-arrow-top-right.svg' | asset_url }}') center / 24px 24px no-repeat;
+        mask: url('{{ icon_url }}') center / {{ icon_mask_size }} no-repeat;
         transition: var(--button-arrow-transition);
       }
 
-      {%- comment -%}
-        Shared trailing-arrow motion — see theme-styles-variables. This is the generic
-        show_arrow_icon path, so every current and future block that opts into the arrow
-        gets the swing without restating it.
-      {%- endcomment -%}
-      .{{ block_settings.style_class }}.{{ block_settings.style_class }}--{{ block_id }}:hover::after {
-        transform: var(--button-arrow-hover-transform);
-      }
+      {%- if icon_style == 'download' -%}
+        {%- comment -%}
+          The download glyph already points down, so it nudges along its own axis rather
+          than swinging round like the arrow. Shared timing, different gesture.
+        {%- endcomment -%}
+        .{{ block_settings.style_class }}.{{ block_settings.style_class }}--{{ block_id }}:hover::after {
+          transform: translate(0, 2px);
+        }
+      {%- else -%}
+        {%- comment -%}
+          Shared trailing-arrow motion — see theme-styles-variables. This is the generic
+          show_arrow_icon path, so every current and future block that opts into the arrow
+          gets the swing without restating it.
+        {%- endcomment -%}
+        .{{ block_settings.style_class }}.{{ block_settings.style_class }}--{{ block_id }}:hover::after {
+          transform: var(--button-arrow-hover-transform);
+        }
+      {%- endif -%}
     {% endif %}
   {% endstyle %}
 {% endif %}
@@ -70,8 +109,16 @@
   {%- assign effective_border_color = block_settings.custom_button_border
     | default: settings.palette_primary_button_border
   -%}
+  {%- comment -%}
+    base.css draws .button-custom's border with `outline` and colours it from
+    --button-focus-outline-color, so this is the ring at rest every bit as much as on focus.
+    A button with a background can fall back to that background. A transparent one has
+    nothing behind the ring, so it follows the border colour instead — on an outline button
+    the ring is the border, and taking the text colour here painted it white over whatever
+    the merchant had set.
+  {%- endcomment -%}
   {%- if effective_background_color.alpha == 0 -%}
-    {%- assign effective_focus_outline_color = effective_text_color -%}
+    {%- assign effective_focus_outline_color = effective_border_color -%}
   {%- else -%}
     {%- assign effective_focus_outline_color = effective_background_color -%}
   {%- endif -%}

@@ -5,6 +5,7 @@
   assign si_body         = product_ref.metafields.custom.sustainability_body         | metafield_tag
   assign si_btn_label    = product_ref.metafields.custom.sustainability_button_label
   assign si_btn_url      = product_ref.metafields.custom.sustainability_button_url
+  assign si_stat_eyebrow = product_ref.metafields.custom.sustainability_stat_eyebrow | default: section.settings.stat_eyebrow
   assign si_stat_value   = product_ref.metafields.custom.sustainability_stat_value
   assign si_stat_label   = product_ref.metafields.custom.sustainability_stat_label   | metafield_tag
   assign si_img_stat     = product_ref.metafields.custom.sustainability_image_stat.value
@@ -13,11 +14,40 @@
   assign si_img_large    = product_ref.metafields.custom.sustainability_image_large.value
   assign si_badge_text   = product_ref.metafields.custom.sustainability_badge_text
 
+  # Resolve alt text up front. Inlining `alt: x.alt | default: ''` inside image_tag silently
+  # breaks it: the pipe starts a new filter on the whole expression, so every argument after
+  # it (including class:) is handed to `default` instead of image_tag and is dropped.
+  assign si_alt_stat  = si_img_stat.alt  | default: si_stat_value
+  assign si_alt_small = si_img_small.alt | default: ''
+  assign si_alt_tall  = si_img_tall.alt  | default: product_ref.title
+  assign si_alt_large = si_img_large.alt | default: ''
+
   # Only render when heading metafield is populated
   assign si_active = false
   unless product_ref.metafields.custom.sustainability_heading == blank
     assign si_active = true
   endunless
+
+  # Figma 2123:578 fills the section with a Sand/200 -> Sand/50 gradient rather than a flat
+  # colour. Built here as a single string, the way blocks/offset-media-card.liquid does it, so
+  # the CSS only ever reads one custom property and never has to know which mode is active.
+  if section.settings.use_gradient
+    capture si_background_image
+      echo 'linear-gradient('
+      echo section.settings.gradient_angle
+      echo 'deg, '
+      echo section.settings.gradient_start_color
+      echo ' '
+      echo section.settings.gradient_start_position
+      echo '%, '
+      echo section.settings.gradient_end_color
+      echo ' '
+      echo section.settings.gradient_end_position
+      echo '%)'
+    endcapture
+  else
+    assign si_background_image = 'none'
+  endif
 -%}
 
 {%- if si_active -%}
@@ -28,7 +58,10 @@
   endif
 %}
  
-<div class="section-background{% if section.settings.background_color != blank %} color-custom-{{ section.id }}{% endif %} sustainability-impact-bg"></div>
+<div
+  class="section-background{% if section.settings.background_color != blank %} color-custom-{{ section.id }}{% endif %} sustainability-impact-bg"
+  style="--sustainability-background-image: {{ si_background_image }};"
+></div>
 
 <section
   class="sustainability-impact section section--page-width spacing-style{% if section.settings.background_color != blank %} color-custom-{{ section.id }}{% endif %}"
@@ -54,16 +87,31 @@
       {%- endif -%}
 
       {%- if si_btn_label != blank -%}
+        {%- comment -%}
+          Figma calls this Button/Primary/LG, so it takes the theme's primary `button` class —
+          `button-secondary` was pulling in the outlined secondary colour tokens.
+        {%- endcomment -%}
         <a
           href="{{ si_btn_url | default: '#' }}"
-          class="sustainability-impact__cta button button-secondary"
+          class="sustainability-impact__cta button"
           {% if section.settings.open_in_new_tab %}
             target="_blank"
             rel="noopener noreferrer"
           {% endif %}
         >
           {{- si_btn_label -}}
-          <span class="sustainability-impact__cta-arrow" aria-hidden="true">&#x2197;</span>
+          <span class="sustainability-impact__cta-arrow" aria-hidden="true">
+            {%- comment -%} Figma 2998:207 — Icon/Arrow Top Right, 24px frame, 2px round stroke. {%- endcomment -%}
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" focusable="false">
+              <path
+                d="M17 17V7H7M17 7L7 17"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </span>
         </a>
       {%- endif -%}
     </div>
@@ -82,12 +130,15 @@
                 loading: 'lazy',
                 widths: '400, 600, 800',
                 sizes: '(min-width: 750px) 400px, 50vw',
-                alt: si_img_stat.alt | default: si_stat_value,
+                alt: si_alt_stat,
                 class: 'sustainability-impact__card-img'
             }}
           </div>
         {%- endif -%}
         <div class="sustainability-impact__stat-overlay">
+          {%- if si_stat_eyebrow != blank -%}
+            <p class="sustainability-impact__stat-eyebrow">{{- si_stat_eyebrow -}}</p>
+          {%- endif -%}
           {%- if si_stat_value != blank -%}
             <p class="sustainability-impact__stat-value">{{- si_stat_value -}}</p>
           {%- endif -%}
@@ -108,7 +159,7 @@
                 loading: 'lazy',
                 widths: '300, 450, 600',
                 sizes: '(min-width: 750px) 300px, 50vw',
-                alt: si_img_small.alt | default: '',
+                alt: si_alt_small,
                 class: 'sustainability-impact__card-img'
             }}
           </div>
@@ -126,7 +177,7 @@
                 loading: 'lazy',
                 widths: '320, 480, 640, 800',
                 sizes: '(min-width: 750px) 200px, 50vw',
-                alt: si_img_tall.alt | default: product_ref.title,
+                alt: si_alt_tall,
                 class: 'sustainability-impact__card-img'
             }}
           </div>
@@ -143,13 +194,19 @@
                 loading: 'lazy',
                 widths: '500, 750, 1000',
                 sizes: '(min-width: 750px) 50vw, 100vw',
-                alt: si_img_large.alt | default: '',
+                alt: si_alt_large,
                 class: 'sustainability-impact__card-img'
             }}
           </div>
           {%- if si_badge_text != blank -%}
             <div class="sustainability-impact__feature-content" aria-label="{{ si_badge_text }}">
-              <span class="sustainability-impact__impact-icon" aria-hidden="true"></span>
+              {%- comment -%}
+                Figma 2123:617 — the "ocean" mark draws its own ring, so it replaces the
+                three-line wave mark that used to sit inside a CSS border circle.
+              {%- endcomment -%}
+              <span class="sustainability-impact__impact-icon" aria-hidden="true">
+                {{- 'sana-ocean-mark.svg' | inline_asset_content -}}
+              </span>
               <span class="sustainability-impact__feature-text">{{- si_badge_text -}}</span>
             </div>
           {%- endif -%}
@@ -168,34 +225,32 @@
 {% stylesheet %}
 
   /* ─────────────────────────────────────────────────
-     Background: warm sand, matching the Figma design.
-     Falls back to the brand sand-100 token when no
-     custom colour is set in section settings.
+     Background — the section's own background is not
+     paintable: base.css forces
+     `.shopify-section:not(.header-section) :is(.section, .cart-summary)`
+     to `background: transparent` at (0,3,0). Everything
+     visible comes from the .section-background sibling,
+     which base.css paints with `background-color:
+     var(--color-background)` at the same specificity.
+     So the gradient rides on background-image, the one
+     background property nothing else declares here, and
+     the flat `background_color` setting keeps working
+     underneath it via contrast-override.
      ───────────────────────────────────────────────── */
   .sustainability-impact-bg {
-    background-color: var(--color-sand-100, #f3ebe1);
+    background-image: var(--sustainability-background-image, none);
   }
 
   .sustainability-impact {
+    /* Figma keeps the heading and body on Teal/800 across every background variant, so these
+       deliberately do not track contrast-override's --color. */
     --sustainability-heading-color: var(--color-teal-800, #064c4d);
     --sustainability-body-color: var(--color-teal-800, #064c4d);
-    --sustainability-stat-value-size: clamp(2.5rem, 6vw, 4.5rem);
-    --sustainability-card-radius: 20px;
+    --sustainability-card-radius: 16px;
 
-    background-color: var(--color-sand-100, #f3ebe1);
     /* Override the default section grid so we can use our own inner layout */
     display: block;
     padding-block: max(64px, calc(var(--spacing-scale, 1) * 5rem));
-  }
-
-  .sustainability-impact.color-custom-{{ section.id }},
-  .sustainability-impact-bg.color-custom-{{ section.id }} {
-    background-color: var(--color-background);
-  }
-
-  .sustainability-impact.color-custom-{{ section.id }} {
-    --sustainability-heading-color: var(--color);
-    --sustainability-body-color: var(--color);
   }
 
   /* ─────────────────────────────────────────────────
@@ -212,10 +267,11 @@
     box-sizing: border-box;
   }
 
+  /* Figma splits the 1280px content column as 423 / 48 gap / 809. */
   @media screen and (min-width: 750px) {
     .sustainability-impact__inner {
-      grid-template-columns: minmax(270px, 0.78fr) minmax(0, 1.82fr);
-      gap: clamp(3rem, 8vw, 9rem);
+      grid-template-columns: minmax(0, 423fr) minmax(0, 809fr);
+      gap: 48px;
       align-items: center;
     }
   }
@@ -230,13 +286,14 @@
     gap: 2rem;
   }
 
+  /* Figma sizes this as Headling/H1 (48px), even though it stays an <h2> in the outline. */
   .sustainability-impact__heading {
-    font-family: var(--font-h2--family, var(--font-primary--family));
-    font-size: var(--font-h2--size, clamp(2.6rem, 3.5vw, 4rem));
-    font-weight: var(--font-h2--weight, 700);
-    line-height: var(--font-h2--line-height, 1.1);
-    letter-spacing: var(--font-h2--letter-spacing, -0.02em);
-    text-transform: var(--font-h2--case, none);
+    font-family: var(--font-heading--family);
+    font-size: var(--font-h1--size, 3rem);
+    font-weight: var(--font-h1--weight, 700);
+    line-height: var(--font-h1--line-height, 1.1);
+    letter-spacing: var(--font-h1--letter-spacing, 0);
+    text-transform: var(--font-h1--case, none);
     color: var(--sustainability-heading-color);
     margin: 0;
   }
@@ -253,28 +310,71 @@
     margin: 0;
   }
 
-  .sustainability-impact__cta {
+  /* Figma 2123:583 "Learn More" — solid Teal/800 pill, white label, UI/Button/Large.
+     Measured 191x53: 28px side padding, 110px label, 10px gap, 15px icon slot. */
+  .sustainability-impact__cta.sustainability-impact__cta {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 10px;
     margin-top: 0.5rem;
+    padding: 14px 28px;
+    border: 0;
+    border-radius: 80px;
+    color: #ffffff;
+    background: var(--color-teal-800, #064c4d);
+    font-size: var(--font-button-lg--size, 1.25rem);
+    font-weight: var(--font-button--weight, 600);
+    line-height: var(--font-button--line-height, normal);
+    letter-spacing: var(--font-button--letter-spacing, 0.02em);
   }
 
+  /* Figma centres a 24px icon frame on a 15px slot, so the glyph overflows by 4.5px a side.
+     Reproducing the slot width rather than the frame width is what keeps the 10px gap honest. */
   .sustainability-impact__cta-arrow {
-    font-size: 1em;
-    line-height: 1;
-    display: inline-block;
+    position: relative;
+    display: block;
+    flex: none;
+    width: 15px;
+    height: 15px;
+  }
+
+  /* Shared arrow motion: --button-arrow-hover-transform levels the ↗ glyph out to → and nudges
+     it 2px right. Referencing the theme vars rather than re-deriving the motion also means
+     prefers-reduced-motion is already handled — theme-styles-variables drops the speed to 0s. */
+  /* Centred with negative margins rather than grid alignment or translate(-50%, -50%): grid
+     start-aligns a subject that overflows its area, and a centring transform would be wiped
+     out by the hover transform below. */
+  .sustainability-impact__cta-arrow svg {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    display: block;
+    width: 24px;
+    height: 24px;
+    margin: -12px 0 0 -12px;
+    /* base.css caps every svg at max-width: 100%, which clamped this to the 15px slot and let
+       preserveAspectRatio shrink the glyph to ~6px. The overflow is deliberate — release it. */
+    max-width: none;
+    transition: var(--button-arrow-transition, transform 0.25s ease);
+  }
+
+  .sustainability-impact__cta:is(:hover, :focus-visible) .sustainability-impact__cta-arrow svg {
+    transform: var(--button-arrow-hover-transform, translate(2px, 0) rotate(45deg));
   }
 
   /* ─────────────────────────────────────────────────
      Right column — mosaic grid
      ───────────────────────────────────────────────── */
+  /* Mosaic proportions come straight from Figma: 267 / 196 / 300 columns, two equal
+     rows, 24px gutters, and an 809x414 outer box. aspect-ratio keeps the rows from
+     being pushed taller by the images' intrinsic height, which minmax(0, 1fr) alone
+     cannot prevent once a card spans both rows. */
   .sustainability-impact__right {
     display: grid;
-    grid-template-columns: minmax(0, 1.35fr) minmax(130px, 1fr) minmax(0, 1.5fr);
-    grid-template-rows: 1fr 1fr;
-    gap: 1.5rem;
-    min-height: 26rem;
+    grid-template-columns: minmax(0, 267fr) minmax(0, 196fr) minmax(0, 300fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 24px;
+    aspect-ratio: 809 / 414;
   }
 
   /* Stat card occupies top-left cell */
@@ -317,10 +417,13 @@
     min-height: 0;
   }
 
-  .sustainability-impact__card-img {
+  /* Doubled class — base.css sets object-fit/height on section images and wins on a
+     tie, which left these letterboxed inside their cards. */
+  .sustainability-impact__card .sustainability-impact__card-img.sustainability-impact__card-img {
     display: block;
     width: 100%;
     height: 100%;
+    aspect-ratio: auto;
     object-fit: cover;
   }
 
@@ -343,29 +446,53 @@
     border-radius: inherit;
   }
 
-  /* When there's no image, give the overlay a solid background */
+  /* When there's no image, give the overlay the Figma Teal/700 -> Teal/500 fill */
   .sustainability-impact__card--without-media .sustainability-impact__stat-overlay {
-    background: var(--color-teal-700, #146b68);
+    background: linear-gradient(150deg, var(--color-teal-700, #146b68), var(--color-teal-500, #42a899));
     position: static;
     height: 100%;
     min-height: 0;
   }
 
+  /* Figma insets the lower-left photo by 12px inside a cream frame (267x196 -> 243x172). */
+  .sustainability-impact__card--small {
+    padding: 12px;
+    background-color: var(--color-sand-100, #f3ebe1);
+  }
+
+  .sustainability-impact__card--small .sustainability-impact__card-media {
+    overflow: hidden;
+    border-radius: calc(var(--sustainability-card-radius) - 6px);
+  }
+
+  /* Figma "EVERY CASE DIVERTS" — UI/Eyebrow (14px / 500 / 1.3 / 30% tracking). */
+  .sustainability-impact__stat-eyebrow {
+    margin: 0;
+    color: #ffffff;
+    font-size: var(--font-eyebrow--size, 0.875rem);
+    font-weight: var(--font-eyebrow--weight, 500);
+    line-height: var(--font-eyebrow--line-height, 1.3);
+    letter-spacing: var(--font-eyebrow--letter-spacing, 0.3em);
+    text-transform: uppercase;
+  }
+
+  /* Figma "18lbs" — Display/Hero (64px / 700 / lh 1 / 1% tracking). */
   .sustainability-impact__stat-value {
-    font-family: var(--font-h1--family, var(--font-primary--family));
-    font-size: var(--sustainability-stat-value-size);
-    font-weight: var(--font-h1--weight, 700);
-    line-height: 1;
-    letter-spacing: -0.02em;
-    margin: 0.5rem 0 0.25rem;
+    font-family: var(--font-heading--family);
+    font-size: var(--font-display-hero--size, 4rem);
+    font-weight: var(--font-display-hero--weight, 700);
+    line-height: var(--font-display-hero--line-height, 1);
+    letter-spacing: var(--font-display-hero--letter-spacing, 0.01em);
+    margin: 0.25rem 0 0.5rem;
     color: #ffffff;
   }
 
+  /* Figma "of plastic from our..." — UI/Label (18px / 600 / 1.25). */
   .sustainability-impact__stat-label {
-    font-size: var(--font-paragraph-small--size, 0.875rem);
-    line-height: 1.4;
+    font-size: var(--font-label--size, 1.125rem);
+    font-weight: var(--font-label--weight, 600);
+    line-height: var(--font-label--line-height, 1.25);
     color: #ffffff;
-    opacity: 0.92;
   }
 
   .sustainability-impact__stat-label p {
@@ -375,7 +502,9 @@
   /* ─────────────────────────────────────────────────
      Badge overlay on large image
      ───────────────────────────────────────────────── */
-  .sustainability-impact__feature::after {
+  /* Was scoped to .sustainability-impact__feature, a class that is never rendered, so the
+     scrim never appeared and the badge text sat unreadably on the photo. */
+  .sustainability-impact__card--feature::after {
     position: absolute;
     content: '';
     inset: 35% 0 0;
@@ -383,30 +512,41 @@
     pointer-events: none;
   }
 
+  /* Figma 2123:612 bottom-anchors the content box: 24px side padding, 32px from the base,
+     24px between the mark and the label. */
   .sustainability-impact__feature-content {
     position: absolute;
     z-index: 1;
-    inset: auto 1.5rem 1.5rem;
+    inset: auto 24px 32px;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 1rem;
+    gap: 24px;
   }
 
+  /* The mark is inlined in the markup — a mask: url() here cannot work, because this
+     stylesheet block is served as static CSS and never has its Liquid rendered.
+     The ocean mark draws its own ring, so there is no CSS border circle around it. */
   .sustainability-impact__impact-icon {
-    width: 4rem;
-    height: 4rem;
-    border: 2px solid #fff;
-    border-radius: 50%;
-    background: #fff;
-    mask: url('{{ 'sana-wave-mark.svg' | asset_url }}') center / 2.9rem auto no-repeat;
+    display: block;
+    width: 68px;
+    height: 68px;
+    color: #fff;
   }
 
+  .sustainability-impact__impact-icon svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    fill: currentcolor;
+  }
+
+  /* Figma Body/XL/SemiBold — 24px / 600 / 1.3. */
   .sustainability-impact__feature-text {
-    font-family: var(--font-h3--family, var(--font-primary--family));
-    font-size: clamp(1.25rem, 1.9vw, 2rem);
-    font-weight: var(--font-h3--weight, 700);
-    line-height: 1.15;
+    font-family: var(--font-heading--family);
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.3;
     color: #fff;
   }
 
@@ -418,55 +558,47 @@
       padding-block: 2.5rem;
     }
 
+    /* aspect-ratio has to be released here, otherwise the desktop 809:414 box squashes
+       the stacked mobile grid. */
+    /* Explicit row heights: left to auto, the portrait tall image drives row 2 to well
+       over twice row 1. */
     .sustainability-impact__right {
-      grid-template-columns: 1.25fr 1fr;
-      grid-template-rows: auto auto auto;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: minmax(220px, auto) 300px;
       gap: 0.75rem;
-      min-height: 0;
+      aspect-ratio: auto;
     }
 
-    /* On mobile, stat and small images are side-by-side in a 2-col row,
-       and the large image spans full width below */
+    /* Every card needs an explicit mobile placement. The previous block only reassigned
+       .--large, which is not a class this section renders (it is .--feature), so the
+       feature card kept its desktop column-3 placement and forced an implicit third
+       column into what should be a two-column grid. */
     .sustainability-impact__card--stat {
-      grid-column: 1 / 2;
-      grid-row: 1 / 2;
+      grid-area: 1 / 1 / 2 / 2;
     }
 
     .sustainability-impact__card--small {
-      grid-column: 1 / 2;
-      grid-row: 2 / 3;
+      grid-area: 1 / 2 / 2 / 3;
     }
 
     .sustainability-impact__card--tall {
-      grid-column: 2 / 3;
-      grid-row: 1 / 3;
-      aspect-ratio: 0.52 / 1;
+      grid-area: 2 / 1 / 3 / 2;
     }
 
     .sustainability-impact__card--feature {
-      grid-column: 1 / 3;
-      grid-row: 3 / 4;
+      grid-area: 2 / 2 / 3 / 3;
     }
 
-    .sustainability-impact__card--stat,
-    .sustainability-impact__card--small {
-      aspect-ratio: 1.35 / 1;
+    .sustainability-impact__card {
+      min-height: 220px;
     }
 
-    .sustainability-impact__card--feature .sustainability-impact__card-media {
-      aspect-ratio: 1.32 / 1;
-    }
-
-    .sustainability-impact__stat-value {
-      font-size: clamp(1.75rem, 8vw, 2.5rem);
+    .sustainability-impact__stat-eyebrow {
+      letter-spacing: 0.18em;
     }
 
     .sustainability-impact__body {
       max-width: none;
-    }
-
-    .sustainability-impact__feature-content {
-      inset: auto 2rem 2rem;
     }
   }
 
@@ -490,16 +622,82 @@
       "content": "Content is pulled from product metafields in the 'custom' namespace. The section is hidden when the 'sustainability_heading' metafield is blank."
     },
     {
+      "type": "text",
+      "id": "stat_eyebrow",
+      "label": "Stat eyebrow",
+      "info": "Shown above the stat figure. Overridden per product by the 'sustainability_stat_eyebrow' metafield.",
+      "default": "Every case diverts"
+    },
+    {
       "type": "checkbox",
       "id": "open_in_new_tab",
       "label": "Open button link in new tab",
       "default": false
     },
     {
+      "type": "header",
+      "content": "Background"
+    },
+    {
+      "type": "checkbox",
+      "id": "use_gradient",
+      "label": "Use gradient background",
+      "info": "Defaults to the warm sand gradient from the design.",
+      "default": true
+    },
+    {
+      "type": "color",
+      "id": "gradient_start_color",
+      "label": "Gradient start",
+      "default": "#e6d7c3",
+      "visible_if": "{{ section.settings.use_gradient }}"
+    },
+    {
+      "type": "color",
+      "id": "gradient_end_color",
+      "label": "Gradient end",
+      "default": "#f7f1eb",
+      "visible_if": "{{ section.settings.use_gradient }}"
+    },
+    {
+      "type": "range",
+      "id": "gradient_angle",
+      "label": "Gradient angle",
+      "min": -180,
+      "max": 180,
+      "step": 4,
+      "unit": "deg",
+      "default": -36,
+      "visible_if": "{{ section.settings.use_gradient }}"
+    },
+    {
+      "type": "range",
+      "id": "gradient_start_position",
+      "label": "Gradient start position",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "%",
+      "default": 35,
+      "visible_if": "{{ section.settings.use_gradient }}"
+    },
+    {
+      "type": "range",
+      "id": "gradient_end_position",
+      "label": "Gradient end position",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "%",
+      "default": 88,
+      "visible_if": "{{ section.settings.use_gradient }}"
+    },
+    {
       "type": "color",
       "id": "background_color",
       "label": "Background colour",
-      "placeholder": "Default (warm sand)"
+      "placeholder": "Default (warm sand)",
+      "info": "Sits behind the gradient. Shown on its own when the gradient is switched off."
     },
     {
       "type": "header",

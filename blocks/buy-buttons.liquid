@@ -93,6 +93,24 @@
             endif
           -%}
 
+          {%- comment -%}
+            Sana PDP purchase layout (Figma 2144:306). The design puts the quantity stepper and
+            the price/Add-to-Cart stack in two independent columns whose internal rhythms do not
+            share rows, so each column gets its own wrapper rather than being placed into a
+            single grid.
+          {%- endcomment -%}
+          {%- if block_settings.show_pdp_price_panel -%}
+            <div class="product-form__quantity-col">
+              <span class="product-form__field-label">
+                {{- block_settings.quantity_label | escape -}}
+                {%- if block_settings.quantity_sublabel != blank -%}
+                  <span class="product-form__field-sublabel">
+                    {{- block_settings.quantity_sublabel | escape -}}
+                  </span>
+                {%- endif -%}
+              </span>
+          {%- endif -%}
+
           {%- if has_quantity_rules -%}
             {%- assign cart_quantity = cart | item_count_for_variant: variant.id -%}
             <div
@@ -132,6 +150,38 @@
                 </span>
               {%- endif -%}
             </div>
+          {%- endif -%}
+
+          {%- if block_settings.show_pdp_price_panel -%}
+            </div>
+            {%- liquid
+              assign units_per_case = product.metafields.custom.units_per_case.value | plus: 0
+              if units_per_case <= 0
+                assign units_per_case = block_settings.units_per_case
+              endif
+              if units_per_case <= 0
+                assign units_per_case = 1
+              endif
+              assign purchase_case_price = variant.price
+              assign purchase_unit_price = purchase_case_price | divided_by: units_per_case
+            -%}
+            <div class="product-form__price-col">
+              <product-price
+                class="product-form__purchase-price"
+                data-block-id="{{ block.id }}-purchase"
+                data-product-id="{{ product.id }}"
+              >
+                <div class="product-form__purchase-price-container" ref="priceContainer">
+                  <div class="product-form__purchase-price-main">
+                    <span class="product-form__field-label">{{ block_settings.price_label | escape }}</span>
+                    <strong>{{ purchase_case_price | money }}</strong>
+                  </div>
+                  <div class="product-form__purchase-unit-price">
+                    <span>{{ block_settings.unit_price_label | escape }}</span>
+                    <strong>{{ purchase_unit_price | money }}</strong>
+                  </div>
+                </div>
+              </product-price>
           {%- endif -%}
 
           {%- if product.quantity_price_breaks_configured? and variant.quantity_price_breaks.size > 0 -%}
@@ -226,6 +276,10 @@
             can_add_to_cart: can_add_to_cart,
             add_to_cart_text: add_to_cart_text
           %}
+
+          {%- if block_settings.show_pdp_price_panel -%}
+            </div>
+          {%- endif -%}
 
           {% content_for 'block',
             type: 'accelerated-checkout',
@@ -392,6 +446,48 @@
       "id": "stacking",
       "label": "t:settings.always_stack_buttons",
       "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "show_pdp_price_panel",
+      "label": "Show quantity and price purchase layout",
+      "default": false
+    },
+    {
+      "type": "text",
+      "id": "quantity_label",
+      "label": "Quantity label",
+      "default": "Quantity:",
+      "visible_if": "{{ block.settings.show_pdp_price_panel }}"
+    },
+    {
+      "type": "text",
+      "id": "quantity_sublabel",
+      "label": "Quantity sub-label",
+      "default": "(Per Case)",
+      "visible_if": "{{ block.settings.show_pdp_price_panel }}"
+    },
+    {
+      "type": "text",
+      "id": "price_label",
+      "label": "Price label",
+      "default": "Price:",
+      "visible_if": "{{ block.settings.show_pdp_price_panel }}"
+    },
+    {
+      "type": "text",
+      "id": "unit_price_label",
+      "label": "Unit price label",
+      "default": "Price Per Unit:",
+      "visible_if": "{{ block.settings.show_pdp_price_panel }}"
+    },
+    {
+      "type": "number",
+      "id": "units_per_case",
+      "label": "Units per case",
+      "info": "Used to derive the per-unit price when the product has no 'units_per_case' metafield.",
+      "default": 1000,
+      "visible_if": "{{ block.settings.show_pdp_price_panel }}"
     },
     {
       "type": "color",

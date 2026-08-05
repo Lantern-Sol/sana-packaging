@@ -35,7 +35,7 @@
 %}
 
 <product-price
-  class="text-block {{ text_block_classes }} text-{{ block_settings.alignment }} {{ block_settings.type_preset | default: 'paragraph' }}{% if block_settings.type_preset_mobile != blank %} mobile-preset-{{ block_settings.type_preset_mobile }}{% endif %} spacing-style"
+  class="text-block{% if block_settings.pdp_low_price_style %} product-price--low-as{% endif %} {{ text_block_classes }} text-{{ block_settings.alignment }} {{ block_settings.type_preset | default: 'paragraph' }}{% if block_settings.type_preset_mobile != blank %} mobile-preset-{{ block_settings.type_preset_mobile }}{% endif %} spacing-style"
   data-block-id="{{ block.id }}"
   data-product-id="{{ product_resource.id }}"
   style="
@@ -49,11 +49,63 @@
   "
   {{ block.shopify_attributes }}
 >
-  {% render 'price',
-    show_unit_price: true,
-    product_resource: product_resource,
-    show_sale_price_first: block_settings.show_sale_price_first
-  %}
+  {% if block_settings.pdp_low_price_style and selected_variant != blank %}
+    {%- comment -%}
+      "Price As Low As" is the cheapest tier, not the current one — walk the variant's volume
+      price breaks and keep the lowest. Falls back to the variant price when none are set.
+    {%- endcomment -%}
+    {% liquid
+      assign units_per_case = product_resource.metafields.custom.units_per_case.value | plus: 0
+      if units_per_case <= 0
+        assign units_per_case = block_settings.units_per_case
+      endif
+      if units_per_case <= 0
+        assign units_per_case = 1
+      endif
+
+      assign pdp_case_price = selected_variant.price
+      for price_break in selected_variant.quantity_price_breaks
+        if price_break.price < pdp_case_price
+          assign pdp_case_price = price_break.price
+        endif
+      endfor
+
+      assign pdp_unit_price = pdp_case_price | divided_by: units_per_case
+
+      # The link jumps to the "Price" accordion row, which removes itself when the product has
+      # no tiers to table. Mirror the tier sources `product-price-table` reads so the link is
+      # only offered when there is something to land on.
+      assign price_tiers = product_resource.metafields.custom.product_price_table.value
+      assign has_price_tiers = false
+      unless price_tiers == blank or price_tiers == empty
+        assign has_price_tiers = true
+      endunless
+      if has_price_tiers == false and product_resource.quantity_price_breaks_configured?
+        if selected_variant.quantity_price_breaks.size > 0
+          assign has_price_tiers = true
+        endif
+      endif
+      if has_price_tiers == false and request.design_mode
+        assign has_price_tiers = true
+      endif
+    %}
+    <div class="product-price__low-container" ref="priceContainer">
+      <p class="product-price__low-label">{{ block_settings.low_price_label | escape }}</p>
+      <div class="product-price__low-values">
+        <span>{{ pdp_unit_price | money }}/unit</span>
+        <span>{{ pdp_case_price | money }}/case</span>
+      </div>
+      {%- if has_price_tiers -%}
+        <a class="product-price__tier-link" href="#ProductPriceAccordion-{{ section.id }}">{{ block_settings.tier_link_label | escape }}</a>
+      {%- endif -%}
+    </div>
+  {% else %}
+    {% render 'price',
+      show_unit_price: true,
+      product_resource: product_resource,
+      show_sale_price_first: block_settings.show_sale_price_first
+    %}
+  {% endif %}
 
   {% if block_settings.show_tax_info %}
     <div class="tax-note">
@@ -86,6 +138,15 @@
   {%- endif -%}
 </product-price>
 
+{% stylesheet %}
+  .product-price--low-as,
+  .product-price__low-container { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+  .product-price--low-as .product-price__low-label { margin: 0; color: #064c4d; font-size: 16px; font-weight: 600; line-height: 1.5; }
+  .product-price__low-values { display: flex; flex-wrap: wrap; gap: 8px; }
+  .product-price__low-values span { padding: 6px 12px; border-radius: 8px; color: #064c4d; background: #d6faf2; font-size: 18px; font-weight: 600; line-height: 1.25; }
+  .product-price__tier-link { color: #6c8283; font-size: 14px; font-weight: 500; line-height: 1.5; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+{% endstylesheet %}
+
 {% schema %}
 {
   "name": "t:names.product_price",
@@ -104,6 +165,34 @@
       "id": "show_sale_price_first",
       "label": "t:settings.show_sale_price_first",
       "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "pdp_low_price_style",
+      "label": "Show Price As Low As layout",
+      "default": false
+    },
+    {
+      "type": "text",
+      "id": "low_price_label",
+      "label": "Low price label",
+      "default": "Price As Low As",
+      "visible_if": "{{ block.settings.pdp_low_price_style }}"
+    },
+    {
+      "type": "text",
+      "id": "tier_link_label",
+      "label": "Tier pricing link label",
+      "default": "View Tiered Pricing",
+      "visible_if": "{{ block.settings.pdp_low_price_style }}"
+    },
+    {
+      "type": "number",
+      "id": "units_per_case",
+      "label": "Units per case",
+      "info": "Used to derive the per-unit price when the product has no 'units_per_case' metafield.",
+      "default": 1000,
+      "visible_if": "{{ block.settings.pdp_low_price_style }}"
     },
     {
       "type": "checkbox",

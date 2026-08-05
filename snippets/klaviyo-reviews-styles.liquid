@@ -1,0 +1,559 @@
+{%- doc -%}
+  Restyles the Klaviyo Reviews "product reviews" widget to the Sana 2026 PDP design.
+
+  Figma: Section/Klavyio Reviews — desktop 2123:621, mobile 2123:2045.
+
+  The widget is injected client-side into the app block's `#fulfilled-reviews-all`
+  mount point, so none of this markup exists in the theme. Everything below targets
+  Klaviyo's own classes. Two things make that safe to rely on:
+
+  1. Klaviyo publishes the `kl_reviews__*` classes and the `--kl-reviews-reviews-*`
+     custom properties as a styling API, and tells integrators to scope overrides
+     under `#klaviyo-product-reviews-wrapper`.
+  2. Klaviyo's stylesheet loads AFTER the theme's, so order never helps us — only
+     specificity does. Their heaviest selectors are triple-class (0,0,3,0), so every
+     rule here is scoped `.section--klaviyo-reviews #klaviyo-product-reviews-wrapper …`
+     (0,1,2,0 or more) and wins outright. Their token defaults live in an
+     `@layer base { :root }` block, which unlayered rules beat regardless.
+
+  The widget renders its own `<h2>Customer reviews</h2>` and the rule beneath it, so
+  the design's card, heading and divider are all restyled here rather than wrapped in
+  extra theme markup.
+
+  @example
+  {% render 'klaviyo-reviews-styles' %}
+{%- enddoc -%}
+
+{% stylesheet %}
+  /* Card gutters: Figma sits the 1280px card inside 80px page margins. The block
+     padding lives here rather than in the section settings because the padding
+     range caps at 100px — `section--product-faq` takes the same route. */
+  .section--klaviyo-reviews {
+    --full-page-grid-central-column-width: min(1280px, calc(100% - 160px));
+    padding-block: 120px;
+  }
+
+  /* The app block lands in a flex column that aligns children to the start, so the
+     widget shrink-wraps to its content and renders a few hundred pixels wide. */
+  .section--klaviyo-reviews .shopify-app-block,
+  .section--klaviyo-reviews #fulfilled-reviews-all {
+    width: 100%;
+  }
+
+  /*
+   * Klaviyo's design tokens. Setting them here covers everything their CSS derives
+   * from a variable; the rules further down handle what they hard-code.
+   *
+   * `secondary-background-color` feeds the merchant-reply bubble AND the tab rule,
+   * which the design paints in two different colours — the bubble wins the variable
+   * and the tab rule is overridden explicitly below.
+   */
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper {
+    --kl-reviews-reviews-primary-background-color: #fff;
+    --kl-reviews-reviews-secondary-background-color: #e1f4f3;
+    --kl-reviews-reviews-accent-color: #5bc5ad;
+    --kl-reviews-reviews-corner-radius: 32px;
+
+    --kl-reviews-reviews-primary-font-font-family: var(--font-body--family);
+    --kl-reviews-reviews-primary-font-font-weight: 400;
+    --kl-reviews-reviews-primary-font-color: #064c4d;
+    --kl-reviews-reviews-secondary-font-font-family: var(--font-body--family);
+    --kl-reviews-reviews-secondary-font-font-weight: 400;
+    --kl-reviews-reviews-secondary-font-color: #6c8283;
+
+    --kl-reviews-reviews-star-color: #ecb83c;
+    --kl-reviews-reviews-empty-star-color: #cdeeec;
+    /* Spacing comes from a margin below instead — see the note on the star badge. */
+    --kl-reviews-reviews-star-spacing: 0px;
+
+    --kl-reviews-reviews-button-color: #064c4d;
+    --kl-reviews-reviews-button-hover-color: #023031;
+    --kl-reviews-reviews-button-font-color: #fff;
+    --kl-reviews-reviews-button-font-font-family: var(--font-body--family);
+    --kl-reviews-reviews-button-font-font-weight: 600;
+    --kl-reviews-reviews-button-corner-radius: 80px;
+
+    --kl-reviews-reviews-filter-button-background-color: #f1f9f9;
+    --kl-reviews-reviews-filter-button-corner-radius: 80px;
+    --kl-reviews-reviews-filter-button-font-color: #89a5a6;
+    --kl-reviews-reviews-filter-button-font-font-family: var(--font-body--family);
+    --kl-reviews-reviews-filter-button-font-font-weight: 400;
+    --kl-reviews-reviews-filter-placeholder-text-color: #89a5a6;
+
+    --kl-reviews-reviews-review-images-size: 139px;
+    --kl-reviews-reviews-review-images-corner-radius: 16px;
+    --kl-reviews-reviews-summary-images-corner-radius: 16px;
+
+    /* The container IS the Figma card — white, 32px radius, 48px padding. */
+    padding: 48px;
+    color: #064c4d;
+    font-family: var(--font-body--family);
+  }
+
+  /* ---------------------------------------------------------------------------
+     Heading — Figma Headling/H2 over a Sea Grey/200 rule, 25px either side.
+     --------------------------------------------------------------------------- */
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__summary__header {
+    margin: 0 0 25px;
+    padding: 0 0 25px;
+    border-bottom: 1px solid #cdeeec;
+    color: #064c4d;
+    font-family: var(--font-heading--family);
+    font-size: var(--font-size--h2);
+    font-weight: 700;
+    line-height: var(--line-height--115);
+    letter-spacing: 0;
+  }
+
+  /* ---------------------------------------------------------------------------
+     Rating summary — "5 /5" beside the star badge, centred in a 492px column.
+     --------------------------------------------------------------------------- */
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__summary {
+    margin-bottom: 48px;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__summary__grid--2-1 {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__summary__grid--2-1 > div {
+    margin-bottom: 0;
+  }
+
+  /* The design drops the rating histogram, which frees the second grid column. */
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__histogram {
+    display: none;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__summary__rating--1-1 {
+    grid-template-columns: minmax(0, 492px);
+    margin: 0;
+  }
+
+  /* Figma gives this row a fixed 176px height with its content optically centred. */
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__summary__average_and_stars {
+    min-height: 176px;
+    margin: 0;
+    gap: 32px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /*
+   * "5" and "/5" are one text run in Figma, so the gap between them is the 8px
+   * (0.2em) tracking on the "5" rather than a margin.
+   */
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__summary__average_value {
+    margin-right: 0;
+    color: #064c4d;
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: 0.2em;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__summary__average_denominator {
+    color: #064c4d;
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: 0.3em;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__summary__stars {
+    min-width: 0;
+    gap: 8px;
+  }
+
+  /* The stars are inline-blocks, so the source newlines between them collapse to a
+     space whose width tracks the inherited font size — which is why an unstyled badge
+     drifts with the viewport. Zeroing it makes the gap below the only spacing. */
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__stars_badge {
+    font-size: 0;
+    line-height: 0;
+  }
+
+  /*
+   * `--kl-reviews-reviews-star-spacing` is applied as padding on a border-box <svg>
+   * with a fixed width, so it squeezes the glyph rather than separating the stars.
+   * A margin gives Figma's 122px badge without distorting them.
+   *
+   * The size is written per context by the widget — 20px in the summary, 16px in the
+   * review list — where Figma uses the same badge in both. It arrives as an inline
+   * style attribute, so `!important` is the only thing that outranks it.
+   */
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__stars_badge svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__stars_badge svg:not(:last-child) {
+    padding-right: 0;
+    margin-right: 5px;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__summary__stars .kl_reviews__stars_badge {
+    height: auto;
+    margin-bottom: 0;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__summary__stars__count {
+    color: #6c8283;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  /* Custom-question summaries are not part of this design; collapse them when the
+     widget renders the containers empty. */
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__answers_grid:empty,
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__answers__view_all:empty {
+    display: none;
+  }
+
+  /* ---------------------------------------------------------------------------
+     Tab bar — "Reviews / Questions" on the left, the two actions on the right,
+     both sitting on a Teal/200 rule with a 3px Teal/400 active indicator.
+
+     The widget's DOM order is actions-then-tabs, which is the mobile stack; the
+     desktop row simply reverses it.
+     --------------------------------------------------------------------------- */
+
+  /* Figma insets the row's contents by 8px but runs the rule and the active
+     indicator to the card edge, so the inset lives on the tab, not on the bar. */
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__list__tabs {
+    margin: 0 0 24px;
+    padding: 0 8px 24px 0;
+    gap: 24px;
+    border-bottom: 1px solid #b3f7e5;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__list__tab_buttons {
+    gap: 32px;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper button.kl_reviews__list__tab {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 0 8px;
+    color: #064c4d;
+    font-family: var(--font-body--family);
+    font-size: var(--font-size--h4);
+    font-weight: 600;
+    line-height: var(--font-h4--line-height);
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper button.kl_reviews__list__tab small {
+    margin-left: 0;
+    color: #6c8283;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  /*
+   * The indicator is anchored to the tab, but the design draws it on the rule at
+   * the bottom of the whole bar. Stretching the tabs to the bar's content height
+   * and offsetting by the bar's padding lands it exactly on that rule.
+   */
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__list__tab--active::after {
+    height: 3px;
+    bottom: -24px;
+    border-radius: 0;
+    background: #5bc5ad;
+  }
+
+  /* ---------------------------------------------------------------------------
+     Filter row — search field plus three pills, Sea Grey/50 on a white hairline.
+     --------------------------------------------------------------------------- */
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__filters {
+    margin-bottom: 24px;
+    padding: 0;
+    gap: 12px;
+    overflow: visible;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__filters .kl_reviews__search {
+    width: 340px;
+    max-width: 100%;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__search input[type='text'] {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 14px 26px;
+    border: 1px solid #fff;
+    border-radius: 80px;
+    background-color: #f1f9f9;
+    color: #89a5a6;
+    font-family: var(--font-body--family);
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  /* 26px inset + 16px glyph + the 10px gap Figma puts before the label. */
+  .section--klaviyo-reviews
+    #klaviyo-product-reviews-wrapper
+    .kl_reviews__search
+    input[type='text'].kl_reviews__input_with_search_icon {
+    padding-left: 52px;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__filters .kl_reviews__search_icon svg {
+    left: 26px;
+    width: 16px;
+    height: 16px;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__filters__pill select,
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__filters__pill button {
+    box-sizing: border-box;
+    padding: 14px 26px;
+    border: 1px solid #fff;
+    border-radius: 80px;
+    background-color: #f1f9f9;
+    color: #89a5a6;
+    font-family: var(--font-body--family);
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  /* Room for the absolutely-positioned chevron: inset + glyph + gap. */
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__filters__pill select {
+    padding-right: 52px;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__filters__pill svg {
+    right: 26px;
+  }
+
+  /* ---------------------------------------------------------------------------
+     Action buttons — outlined "Ask a question", filled "Write a review".
+     --------------------------------------------------------------------------- */
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__button_bar {
+    gap: 16px;
+    justify-content: flex-start;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper button.kl_reviews__button {
+    margin: 0;
+    padding: 10px 20px;
+    border: 1px solid #064c4d;
+    border-radius: 80px;
+    background-color: #064c4d;
+    color: #fff;
+    font-family: var(--font-body--family);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: normal;
+    letter-spacing: 0.02em;
+  }
+
+  .section--klaviyo-reviews
+    #klaviyo-product-reviews-wrapper
+    .kl_reviews__button_bar
+    button.kl_reviews__button:first-child {
+    background-color: transparent;
+    color: #064c4d;
+  }
+
+  .section--klaviyo-reviews
+    #klaviyo-product-reviews-wrapper
+    .kl_reviews__button_bar
+    button.kl_reviews__button:first-child:hover {
+    background-color: #064c4d;
+    color: #fff;
+  }
+
+  /* ---------------------------------------------------------------------------
+     Review list.
+     --------------------------------------------------------------------------- */
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__review_item {
+    margin-bottom: 48px;
+    padding-bottom: 0;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__review_item:last-child {
+    margin-bottom: 0;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__review_item > div {
+    gap: 24px;
+  }
+
+  /* A review with no title, media or reply still renders the container, which would
+     otherwise contribute a 24px gap to the stack above. */
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__review__title:empty,
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__review__image_row:empty,
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__review__response:empty {
+    display: none;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__review__timestamp {
+    color: #6c8283;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__review__author {
+    margin-bottom: 12px;
+    gap: 8px;
+    color: #6c8283;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* Figma lists "Verified buyer" as plain text with no badge glyph. */
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__review__verified svg {
+    display: none;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper p.kl_reviews__review__content {
+    margin-bottom: 0;
+    color: #6c8283;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__review__image {
+    margin: 0;
+  }
+
+  /* ---------------------------------------------------------------------------
+     Merchant reply — indented, with the response in a Sea Grey/100 bubble.
+     --------------------------------------------------------------------------- */
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__review__response {
+    padding-left: 32px;
+    border-left: 0;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper p.kl_reviews__review__response_title {
+    margin-bottom: 12px;
+    padding-left: 0;
+    color: #6c8283;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .section--klaviyo-reviews #klaviyo-product-reviews-wrapper p.kl_reviews__review__response_content {
+    padding: 10px 18px;
+    border-radius: 16px;
+    background: #e1f4f3;
+    color: #6c8283;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  /* ---------------------------------------------------------------------------
+     Desktop layout. Klaviyo flips its own tab bar at 700px; the theme breaks at
+     750px, so both sides of that boundary are stated explicitly.
+     --------------------------------------------------------------------------- */
+
+  @media screen and (min-width: 750px) {
+    .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__list__tabs {
+      flex-direction: row-reverse;
+      align-items: stretch;
+      justify-content: space-between;
+    }
+
+    /* Stretching the tab row to the action row's height puts every tab's bottom
+       edge on the bar's rule, which is what the ::after offset assumes. */
+    .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__list__tab_buttons {
+      align-items: stretch;
+    }
+
+    .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__button_bar {
+      align-items: center;
+    }
+  }
+
+  /* ---------------------------------------------------------------------------
+     Mobile — Figma 2123:2045.
+     --------------------------------------------------------------------------- */
+
+  @media screen and (max-width: 749px) {
+    .section--klaviyo-reviews {
+      --full-page-grid-central-column-width: calc(100% - 32px);
+      padding-block: 48px;
+    }
+
+    .section--klaviyo-reviews #klaviyo-product-reviews-wrapper {
+      padding: 24px 16px;
+    }
+
+    .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__summary__header {
+      text-align: center;
+    }
+
+    .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__summary__rating--1-1 {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__summary__average_and_stars {
+      min-height: 82px;
+    }
+
+    .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__list__tabs {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    /* Stacked, the actions no longer sit opposite the tabs, so they take the 8px
+       inset the tabs carry on their own. */
+    .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__button_bar {
+      padding-left: 8px;
+    }
+
+    .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__filters {
+      gap: 8px;
+    }
+
+    /* Figma draws this at a flat 150px, which clips "Search reviews" at the rendered
+       font. Growing into the slack left on its wrapped row keeps the placeholder whole. */
+    .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__filters .kl_reviews__search {
+      flex: 1 1 150px;
+      width: auto;
+      min-width: 150px;
+    }
+
+    .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__search input[type='text'] {
+      padding-inline: 16px;
+    }
+
+    .section--klaviyo-reviews
+      #klaviyo-product-reviews-wrapper
+      .kl_reviews__search
+      input[type='text'].kl_reviews__input_with_search_icon {
+      padding-left: 42px;
+    }
+
+    .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__filters .kl_reviews__search_icon svg {
+      left: 16px;
+    }
+
+    .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__filters__pill select,
+    .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__filters__pill button {
+      padding-inline: 16px;
+    }
+
+    .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__filters__pill select {
+      padding-right: 42px;
+    }
+
+    .section--klaviyo-reviews #klaviyo-product-reviews-wrapper .kl_reviews__filters__pill svg {
+      right: 16px;
+    }
+  }
+{% endstylesheet %}

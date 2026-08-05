@@ -33,6 +33,13 @@
 </div>
 
 {% stylesheet %}
+  /* ==========================================================================
+     Sana PDP details column — Figma "Section/Product Detials" 2123:175 (desktop)
+     and 2123:1573 (mobile). Every measurement below is the literal Figma value
+     for the 512px details column; the type scale itself comes from the theme
+     presets, which are generated from the same Figma spec.
+     ========================================================================== */
+
   /* Clear padding on mobile, if not full-width */
   @media screen and (max-width: 749px) {
     .product-information.section--page-width .product-details > .group-block {
@@ -49,6 +56,550 @@
     display: flex;
     align-self: start;
     justify-content: center;
+  }
+
+  /* Figma stacks the details blocks 48px apart on desktop, 32px on mobile. */
+  .product-details > .group-block > .group-block-content {
+    gap: 48px;
+  }
+
+  /* Figma columns: media 702 + 66 gutter + details 512 inside the 1280 content column.
+     The section's own gap setting is left at 0 and the gutter is a real column-gap here, so
+     the tracks stay the literal Figma widths. The class is doubled so this outranks the
+     generic `1fr min(50vw, …)` / `1.557fr 1fr` rules in product-information-content
+     regardless of which stylesheet the bundler emits first. */
+  @media screen and (min-width: 750px) {
+    .product-information__grid.product-information__grid:has(.product-details .product-price--low-as) {
+      grid-template-columns: minmax(0, 702fr) minmax(0, 512fr);
+      column-gap: 66px;
+    }
+  }
+
+  /* --- Header group: title, price summary, reviews, description ------------ */
+
+  .product-details .group-block-content:has(> .product-price--low-as) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 24px;
+  }
+
+  /* Size/weight/line-height come from the h2 type preset (40px/700/1.15 desktop, 32px mobile),
+     which is generated from the same Figma scale — only the measure and colour are set here. */
+  .product-details .group-block-content:has(> .product-price--low-as) h1 {
+    width: min(100%, 420px);
+    color: #064c4d;
+  }
+
+  .product-details .group-block-content:has(> .product-price--low-as) > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  .product-details .group-block-content:has(> .product-price--low-as) > .product-price--low-as {
+    grid-column: 1;
+  }
+
+  /* The review stars sit top-right of the price summary row … */
+  .product-details .group-block-content:has(> .product-price--low-as) > .product-price--low-as + * {
+    grid-column: 2;
+    justify-self: end;
+    align-self: start;
+  }
+
+  /* … and anything after it (the short description) spans the row again. */
+  .product-details .group-block-content:has(> .product-price--low-as) > .product-price--low-as + * ~ * {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+  }
+
+  /* --- Purchase row: Color | Quantity | Price + Add to Cart ---------------- */
+
+  /* Figma 2144:275 lays the three controls on ONE row (114 / 94 / 240 with 32px gutters).
+     The quantity stepper and the price panel live inside the buy-buttons block, so its
+     wrapper chain is flattened with `display: contents` and the two columns it owns become
+     direct items of this grid. That keeps the row a single source of truth for the layout
+     instead of pulling the buy buttons up over the variant picker with a negative margin. */
+  .product-details .group-block-content:has(> .buy-buttons-block) {
+    display: grid;
+    grid-template-columns: minmax(0, 114fr) minmax(0, 94fr) minmax(0, 240fr);
+    align-items: start;
+    column-gap: 32px;
+    row-gap: 32px;
+  }
+
+  .product-details .group-block-content:has(> .buy-buttons-block) > .buy-buttons-block,
+  .product-details .group-block-content:has(> .buy-buttons-block) product-form-component,
+  .product-details .group-block-content:has(> .buy-buttons-block) product-form-component > form,
+  .product-details .group-block-content:has(> .buy-buttons-block) .product-form-buttons {
+    display: contents;
+  }
+
+  .product-details .group-block-content:has(> .buy-buttons-block) > variant-picker {
+    grid-column: 1;
+    grid-row: 1;
+    display: block;
+    min-width: 0;
+  }
+
+  .product-details .group-block-content:has(> .buy-buttons-block) .product-form__quantity-col {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .product-details .group-block-content:has(> .buy-buttons-block) .product-form__price-col {
+    grid-column: 3;
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    min-width: 0;
+  }
+
+  /* Anything else the buy-buttons block may emit (accelerated checkout, quantity rules,
+     volume pricing) takes the full row rather than landing in an auto-placed cell. */
+  .product-details .group-block-content:has(> .buy-buttons-block) > .product-form-text__error,
+  .product-details .group-block-content:has(> .buy-buttons-block) > .quantity-label,
+  .product-details .group-block-content:has(> .buy-buttons-block) > .quantity-rules,
+  .product-details .group-block-content:has(> .buy-buttons-block) > volume-pricing,
+  .product-details .group-block-content:has(> .buy-buttons-block) accelerated-checkout-block,
+  .product-details .group-block-content:has(> .buy-buttons-block) .additional-checkout-buttons {
+    grid-column: 1 / -1;
+  }
+
+  /* --- Field labels (Color: / Quantity: / Price:) -------------------------- */
+
+  /* Figma "UI/Label/Defult" 18/600/1.25 with a 14/400/1.5 sub-line, and the control
+     starting 72px below the top of the label block. */
+  .product-details .variant-option--buttons legend,
+  .product-details .variant-option[data-testid='variant-option-single'],
+  .product-details .product-form__quantity-col > .product-form__field-label {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-height: 45px;
+    margin: 0 0 27px;
+    padding: 0;
+    color: #064c4d;
+    font-family: var(--font-body--family);
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  .product-details .product-form__field-label {
+    color: #064c4d;
+    font-family: var(--font-body--family);
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  .product-details .variant-option__name::after {
+    content: ':';
+  }
+
+  .product-details .variant-option__swatch-value,
+  .product-details .product-form__field-sublabel {
+    padding: 0;
+    color: #064c4d;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  /* --- Colour swatches ----------------------------------------------------- */
+
+  .product-details .variant-option {
+    min-width: 0;
+    margin: 0;
+  }
+
+  .product-details .variant-picker__form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 32px;
+  }
+
+  .product-details .variant-option--buttons {
+    gap: 10px;
+  }
+
+  /* Figma 2144:279 — 52 x 65 tile, 8px radius, 1px Sand/400 ring on the selected value. */
+  .product-details .variant-option--swatches .variant-option__button-label {
+    flex: 0 0 auto;
+    width: 52px;
+    min-width: 52px;
+    height: 65px;
+    min-height: 65px;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid transparent;
+    border-radius: 8px;
+  }
+
+  /* The swatch derives its box from --swatch-width/height (and uses them for background-size),
+     so both have to move together for the image to fill the tile. */
+  .product-details .variant-option--swatches .variant-option__button-label .swatch {
+    --swatch-width: 52px;
+    --swatch-height: 65px;
+
+    width: 52px;
+    height: 65px;
+    border: 0;
+    border-radius: 7px;
+    background-size: cover;
+  }
+
+  /* The theme's global swatch radius is a 32px pill, which rounds the 52 x 65 tile into an
+     oval. Re-pointing the variable fixes the label and the swatch together — overriding
+     `border-radius` on the label alone loses to `.variant-picker .variant-option--buttons
+     label:has(.swatch)`, which is a step more specific and lands later in the cascade. */
+  .product-details .variant-option--swatches {
+    --variant-picker-swatch-radius: 8px;
+
+    width: auto;
+  }
+
+  .product-details .variant-option--swatches .variant-option__button-label:has(:checked) {
+    border-color: #bfac94;
+  }
+
+  /* Figma dims the values that are not selected (30% with a Sand/400 wash) so the chosen
+     tile reads as the only active one. */
+  .product-details .variant-option--swatches .variant-option__button-label:not(:has(:checked)) {
+    position: relative;
+    opacity: 0.3;
+  }
+
+  .product-details .variant-option--swatches .variant-option__button-label:not(:has(:checked))::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: rgb(191 172 148 / 0.3);
+    pointer-events: none;
+  }
+
+  .product-details .variant-option--swatches .variant-option__button-label:not(:has(:checked)):hover {
+    opacity: 0.7;
+  }
+
+  /* --- Quantity stepper ---------------------------------------------------- */
+
+  .product-details .product-form__quantity-col .quantity-selector-wrapper {
+    width: 100%;
+    gap: 0;
+  }
+
+  /* Figma 2144:299 — 65px tall Sand/50 field, 10px radius, value left, stacked chevrons
+     right. Class doubled so it outranks `.product-details .quantity-selector` in base.css,
+     which is emitted after this stylesheet. */
+  .product-details .quantity-selector.quantity-selector--chevron {
+    --quantity-selector-width: auto;
+
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    align-items: center;
+    align-self: auto;
+    flex: 1 1 auto;
+    width: 100%;
+    height: 65px;
+    padding: 10px 14px;
+    border: 0;
+    border-radius: 10px;
+    column-gap: 14px;
+    row-gap: 10px;
+    color: #064c4d;
+    background: #f7f1eb;
+  }
+
+  .product-details .quantity-selector.quantity-selector--chevron input[type='number'] {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    height: auto;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    color: inherit;
+    background: transparent;
+    font-family: var(--font-body--family);
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.5;
+    text-align: center;
+  }
+
+  .product-details .quantity-selector.quantity-selector--chevron :is(.quantity-minus, .quantity-plus) {
+    position: relative;
+    grid-column: 2;
+    width: 11px;
+    height: 6px;
+    min-width: 0;
+    min-height: 0;
+    border-radius: 0;
+    color: inherit;
+  }
+
+  /* Restore a usable tap target without disturbing the 11 x 6 Figma box. */
+  .product-details .quantity-selector.quantity-selector--chevron :is(.quantity-minus, .quantity-plus)::after {
+    content: '';
+    position: absolute;
+    inset: -8px -10px;
+  }
+
+  .product-details .quantity-selector.quantity-selector--chevron .quantity-plus {
+    grid-row: 1;
+  }
+
+  .product-details .quantity-selector.quantity-selector--chevron .quantity-minus {
+    grid-row: 2;
+  }
+
+  .product-details .quantity-selector.quantity-selector--chevron .svg-wrapper {
+    display: block;
+    width: 6px;
+    height: 11px;
+  }
+
+  .product-details .quantity-selector.quantity-selector--chevron svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .product-details .quantity-selector.quantity-selector--chevron .quantity-plus .svg-wrapper {
+    transform: rotate(-90deg);
+  }
+
+  .product-details .quantity-selector.quantity-selector--chevron .quantity-minus .svg-wrapper {
+    transform: rotate(90deg);
+  }
+
+  .product-details .quantity-selector.quantity-selector--chevron :is(.quantity-minus, .quantity-plus):disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  /* --- Price panel --------------------------------------------------------- */
+
+  .product-details .product-form__purchase-price {
+    display: block;
+  }
+
+  .product-details .product-form__purchase-price-container {
+    display: grid;
+    gap: 8px;
+  }
+
+  /* Both rows are a two-up grid inside an 8px left inset, which lands the value column on
+     the Figma 116px track. */
+  .product-details .product-form__purchase-price-main,
+  .product-details .product-form__purchase-unit-price {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    padding-left: 8px;
+    color: #064c4d;
+  }
+
+  .product-details .product-form__purchase-price-main {
+    align-items: start;
+    min-height: 37px;
+  }
+
+  .product-details .product-form__purchase-price-main strong {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 35px;
+    padding-inline: 8px;
+    border: 1px solid #064c4d;
+    border-radius: 10px;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.25;
+    text-align: center;
+  }
+
+  .product-details .product-form__purchase-unit-price {
+    align-items: center;
+    min-height: 29px;
+    padding-block: 4px;
+    border-radius: 4px;
+    background: #f0fdfa;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  .product-details .product-form__purchase-unit-price strong {
+    font-weight: 400;
+    text-align: center;
+  }
+
+  /* --- Add to cart --------------------------------------------------------- */
+
+  .product-details .product-form__price-col add-to-cart-component,
+  .product-details .product-form__price-col .add-to-cart-button {
+    width: 100%;
+  }
+
+  /* Figma "Button/Primary/M" — 48px pill, UI/Button/Medium (16/600/auto, +2% tracking). */
+  .product-details .buy-buttons-block .add-to-cart-button {
+    height: 48px;
+    min-height: 48px;
+    padding: 14px 28px;
+    border-radius: 80px;
+    color: #fff;
+    background: #064c4d;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: normal;
+    letter-spacing: 0.02em;
+  }
+
+  .product-details .buy-buttons-block .add-to-cart-button .add-to-cart-text::after {
+    content: '+';
+    margin-inline-start: 10px;
+    font-size: 20px;
+    font-weight: 400;
+    line-height: 1;
+  }
+
+  /* --- Packaging detail note ----------------------------------------------- */
+
+  /* Figma 2144:781 — 14px SeaGrey body with a Teal/800 semibold lead-in. The note is the
+     text block immediately before the accordion; its colour comes from the block's own
+     setting, the size and lead-in weight from here. */
+  .product-details .group-block-content > .text-block:has(+ .accordion) :is(p, li) {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .product-details .group-block-content > .text-block:has(+ .accordion) :is(strong, b) {
+    color: #064c4d;
+    font-weight: 600;
+  }
+
+  /* --- Accordion ----------------------------------------------------------- */
+
+  /* Figma 2123:341 — Sand/400 rules, 24px block padding, H5 (20/600/1.3) summaries and a
+     12px plus/minus glyph 8px in from the right edge. */
+  /* The theme's global border width is 0, so `accordion--dividers` draws nothing. Figma rules
+     every row, including above the first and below the last. */
+  .product-details .accordion {
+    --color-border: #bfac94;
+    --style-border-width: 1px;
+  }
+
+  .product-details .accordion accordion-custom .details,
+  .product-details .accordion accordion-custom:first-child .details {
+    border-block-start: 1px solid #bfac94;
+  }
+
+  .product-details .accordion accordion-custom:last-child .details {
+    border-block-end: 1px solid #bfac94;
+  }
+
+  .product-details .accordion .details__header {
+    gap: 16px;
+    padding-block: 24px;
+    padding-inline: 0 8px;
+    min-height: 0;
+    color: #064c4d;
+    font-family: var(--font-body--family);
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .product-details .accordion .details__header .icon-plus {
+    flex-shrink: 0;
+    width: 12px;
+    height: 12px;
+  }
+
+  .product-details .accordion .details__header .icon-plus svg {
+    display: block;
+    width: 12px;
+    height: 12px;
+  }
+
+  .product-details .accordion .details-content {
+    color: #6c8283;
+  }
+
+  /* Only the open row carries the closing 24px — base.css zeroes it while collapsed and this
+     stylesheet outranks it, so the state has to be restated here. */
+  .product-details .accordion details[open] .details-content {
+    padding-block: 0 24px;
+  }
+
+  .product-details .accordion details:not([open]) .details-content {
+    padding-block: 0;
+  }
+
+  .product-details .accordion .details-content :is(p, li) {
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  .product-details .accordion .details-content > * + * {
+    margin-top: 24px;
+  }
+
+  /* --- Mobile -------------------------------------------------------------- */
+
+  @media screen and (max-width: 749px) {
+    .product-details > .group-block > .group-block-content {
+      gap: 32px;
+    }
+
+    /* The price summary and the review stars stack on mobile (Figma 2123:1709). The two
+       desktop placement rules are more specific than a blanket `> *`, so they are restated
+       rather than overridden. */
+    .product-details .group-block-content:has(> .product-price--low-as) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .product-details .group-block-content:has(> .product-price--low-as) > *,
+    .product-details .group-block-content:has(> .product-price--low-as) > .product-price--low-as + *,
+    .product-details .group-block-content:has(> .product-price--low-as) > .product-price--low-as + * ~ * {
+      grid-column: 1;
+      justify-self: stretch;
+    }
+
+    /* Colour (114) and quantity (94) keep their Figma widths on the first row; price and Add
+       to Cart span the full width below (Figma 2123:1723). The trailing 1fr track absorbs the
+       leftover so the spanning row still reaches the full column — `114fr 1fr` would hand the
+       first track 114/115 of the row, and `max-content` tracks would be stretched by the
+       spanning item. */
+    .product-details .group-block-content:has(> .buy-buttons-block) {
+      grid-template-columns: 114px 94px minmax(0, 1fr);
+      row-gap: 32px;
+    }
+
+    .product-details .group-block-content:has(> .buy-buttons-block) .product-form__price-col {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+
+    /* Mobile drops the label-to-control offset from 72px to 55px. */
+    .product-details .variant-option--buttons legend,
+    .product-details .variant-option[data-testid='variant-option-single'],
+    .product-details .product-form__quantity-col > .product-form__field-label {
+      margin-bottom: 10px;
+    }
+
+    .product-details .variant-picker__form {
+      gap: 24px;
+    }
   }
 
   @media screen and (min-width: 750px) {

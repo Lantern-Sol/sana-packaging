@@ -1,6 +1,33 @@
 import { Component } from '@theme/component';
 import { fetchConfig } from '@theme/utilities';
-import { CartAddEvent, CartUpdateEvent } from '@theme/events';
+import { CartLinesUpdateEvent } from '@shopify/events';
+
+/**
+ * Reads the cart back after a write, the way the standard cart event wants it.
+ *
+ * Mirrors product-form's own refresh: the cart-items component holds the
+ * authoritative copy on pages that render one, and the Ajax API is the fallback
+ * everywhere else (a product page with no cart section, for instance).
+ *
+ * @returns {Promise<any>} the cart, in Ajax API shape
+ */
+async function refreshCart() {
+  const cartItems = /** @type {any} */ (document.querySelector('cart-items-component'));
+
+  if (cartItems) {
+    await customElements.whenDefined('cart-items-component');
+    return cartItems.fetchCartData();
+  }
+
+  const response = await fetch(`${Theme.routes.cart_url}.json`, {
+    headers: { Accept: 'application/json' },
+    credentials: 'same-origin',
+  });
+
+  if (!response.ok) throw new Error(`Failed to fetch cart: ${response.status}`);
+
+  return response.json();
+}
 
 const COOKIE_NAME = 'bm_bundle';
 const COOKIE_DAYS = 365;
@@ -877,8 +904,12 @@ class BuildABoxSection extends Component {
   }
 
   /**
-   * POST a single line to /cart/add.js and dispatch CartAdd/CartUpdate so the
-   * theme's cart-drawer (and bubble) refresh.
+   * POST a single line to /cart/add.js and announce it on the standard cart
+   * event, so the theme's cart-drawer (and bubble) refresh.
+   *
+   * The event goes out before the request, carrying the promise its listeners
+   * await — that is what lets them shimmer immediately and settle on the real
+   * cart once it lands.
    *
    * @param {number} variantId
    * @param {number} quantity
@@ -897,29 +928,44 @@ class BuildABoxSection extends Component {
     const cfg = fetchConfig('javascript', { body: JSON.stringify(payload) });
     cfg.headers = { ...cfg.headers, 'Content-Type': 'application/json', Accept: 'application/json' };
 
-    const res = await fetch(Theme.routes.cart_add_url, cfg);
-    const data = await res.json();
-    if (data.status && data.status !== 200) {
-      throw new Error(data.message || 'cart/add failed');
-    }
+    const deferred = CartLinesUpdateEvent.createPromise();
 
     this.dispatchEvent(
-      new CartAddEvent({}, String(variantId), {
-        source: 'build-a-box-modal',
-        itemCount: quantity,
-        productId: String(variantId),
-        sections: data.sections,
-      })
-    );
-    document.dispatchEvent(
-      new CartUpdateEvent(data, String(variantId), {
-        source: 'build-a-box-modal',
-        itemCount: quantity,
-        sections: data.sections,
+      new CartLinesUpdateEvent({
+        action: 'add',
+        context: 'product',
+        lines: [{ merchandiseId: String(variantId), quantity }],
+        promise: deferred.promise,
       })
     );
 
-    return data;
+    try {
+      const res = await fetch(Theme.routes.cart_add_url, cfg);
+      const data = await res.json();
+      if (data.status && data.status !== 200) {
+        throw new Error(data.message || 'cart/add failed');
+      }
+
+      const cart = await refreshCart();
+      deferred.resolve({
+        cart: CartLinesUpdateEvent.createCartFromAjaxResponse(cart),
+        detail: {
+          items: cart.items,
+          source: 'build-a-box-modal',
+          sourceId: this.id || 'build-a-box-modal',
+          itemCount: quantity,
+          productId: String(variantId),
+          sections: data.sections,
+          didError: false,
+        },
+      });
+
+      return data;
+    } catch (error) {
+      // Leaving the promise pending would strand every listener mid-shimmer.
+      deferred.reject(error);
+      throw error;
+    }
   }
 
   /**
@@ -1126,38 +1172,52 @@ class BundleBar extends Component {
     const cfg = fetchConfig('javascript', { body: JSON.stringify(payload) });
     cfg.headers = { ...cfg.headers, 'Content-Type': 'application/json', Accept: 'application/json' };
 
+    const totalCount = items.length;
+    const deferred = CartLinesUpdateEvent.createPromise();
+
+    this.dispatchEvent(
+      new CartLinesUpdateEvent({
+        action: 'add',
+        context: 'product',
+        lines: items.map((item) => ({
+          merchandiseId: String(item.variant_id),
+          quantity: 1,
+        })),
+        promise: deferred.promise,
+      })
+    );
+
     try {
       const res = await fetch(Theme.routes.cart_add_url, cfg);
       const data = await res.json();
       if (data.status && data.status !== 200) {
         // eslint-disable-next-line no-console
         console.error('Bundle add failed:', data);
+        deferred.reject(new Error(data.message || 'Bundle add failed'));
         return;
       }
 
       BundleStore.clear();
 
-      const totalCount = items.length;
-      this.dispatchEvent(
-        new CartAddEvent({}, this.id || 'bundle-bar', {
+      const cart = await refreshCart();
+      deferred.resolve({
+        cart: CartLinesUpdateEvent.createCartFromAjaxResponse(cart),
+        detail: {
+          items: cart.items,
           source: 'bundle-bar',
+          sourceId: this.id || 'bundle-bar',
           itemCount: totalCount,
           sections: data.sections,
-        })
-      );
-      document.dispatchEvent(
-        new CartUpdateEvent(data, this.id || 'bundle-bar', {
-          source: 'bundle-bar',
-          itemCount: totalCount,
-          sections: data.sections,
-        })
-      );
+          didError: false,
+        },
+      });
 
       const drawer = /** @type {any} */ (document.querySelector('cart-drawer-component'));
       if (drawer?.showDialog) drawer.showDialog();
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Bundle add error', err);
+      deferred.reject(err);
     } finally {
       delete cta.dataset.busy;
     }

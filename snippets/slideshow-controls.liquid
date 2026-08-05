@@ -12,6 +12,7 @@
   @param {string} [icon_style] - The style of the icon, defaults to 'arrow'
   @param {string} [shape] - The shape of the control, defaults to 'square'
   @param {string} [aspect_ratio] - The aspect ratio of thumbnails, if applicable. defaults to 'adapt'
+  @param {number} [overflow_after] - Cap the thumbnail strip at this many tiles; the last one becomes a "+N" cover. 0/blank renders every thumbnail.
   @param {string} [class] - Additional classes to apply to the controls
   @param {boolean} [secondary] - Whether the controls are secondary
   @param {image} [custom_icon] - The custom icon image
@@ -50,6 +51,8 @@
   else
     assign scroll_mode = 'horizontal'
   endif
+
+  assign thumbnail_limit = overflow_after | default: 0 | plus: 0
 -%}
 
 <slideshow-controls
@@ -125,8 +128,21 @@
       >
         <div class="slideshow-controls__thumbnails">
           {% for media in thumbnails %}
+            {%- liquid
+              # Figma 2123:224 caps the strip and turns the last tile into a "+N more" cover.
+              assign is_overflow_tile = false
+              if thumbnail_limit > 0
+                if forloop.index > thumbnail_limit
+                  break
+                endif
+                if forloop.length > thumbnail_limit and forloop.index == thumbnail_limit
+                  assign is_overflow_tile = true
+                  assign overflow_count = forloop.length | minus: thumbnail_limit | plus: 1
+                endif
+              endif
+            -%}
             <button
-              class="slideshow-control button button-unstyled slideshow-controls__thumbnail"
+              class="slideshow-control button button-unstyled slideshow-controls__thumbnail{% if is_overflow_tile %} slideshow-controls__thumbnail--overflow{% endif %}"
               aria-label="{{ 'accessibility.slide_status' | t: index: forloop.index, length: forloop.length }}"
               on:click="/select/{{ forloop.index0 }}"
               style="--aspect-ratio: {% if aspect_ratio == 'adapt' %}{{ media.preview_image.aspect_ratio | default: 1.0 }}{% else %}{{ aspect_ratio }}{% endif %};"
@@ -135,6 +151,9 @@
                 aria-selected="true"
               {% endif %}
             >
+              {% if is_overflow_tile %}
+                <span class="slideshow-controls__thumbnail-overflow">+{{ overflow_count }}</span>
+              {% endif %}
               {% liquid
                 assign focal_point_style = ''
                 if media.presentation.focal_point != blank

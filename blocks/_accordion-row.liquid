@@ -1,40 +1,65 @@
 {% assign block_settings = block.settings %}
 
-{% capture accordion_row_children %}
-  <details
-    class="details"
-    data-testid="accordion-details"
-    {% if block_settings.open_by_default %}
-      open
-    {% endif %}
-    {{ block.shopify_attributes }}
-  >
-    <summary class="details__header">
-      {% render 'icon-or-image',
-        icon: block_settings.icon,
-        image_upload: block_settings.image_upload,
-        width: block_settings.width,
-        class_name: 'details__icon'
-      %}
-      {{ block_settings.heading }}
-      <span class="svg-wrapper icon-caret icon-animated">
-        {{- 'icon-caret.svg' | inline_asset_content -}}
-      </span>
-      <span class="svg-wrapper icon-plus">
-        {{- 'icon-plus.svg' | inline_asset_content -}}
-      </span>
-    </summary>
+{%- capture row_content -%}
+  {% content_for 'blocks' %}
+{%- endcapture -%}
 
-    <div class="details-content">
-      {% content_for 'blocks' %}
-    </div>
-  </details>
-{% endcapture %}
-{% render 'accordion-custom-component',
-  children: accordion_row_children,
-  open_by_default_on_desktop: block_settings.open_by_default,
-  open_by_default_on_mobile: block_settings.open_by_default
+{% liquid
+  # The blocks these rows carry — text bound to a metafield, the price and spec tables, the
+  # template downloads — each render nothing at all when their data is missing. A row whose
+  # children collapse to whitespace is therefore a heading that opens onto an empty panel,
+  # so the row drops out entirely. The editor keeps every row, otherwise a merchant could
+  # never select an empty one to give it content.
+  assign row_content_stripped = row_content | strip
+
+  assign render_row = false
+  if row_content_stripped != blank or request.design_mode or request.visual_preview_mode
+    assign render_row = true
+  endif
 %}
+
+{%- if render_row -%}
+  {% capture accordion_row_children %}
+    <details
+      {% if block_settings.heading == 'Price' %}id="ProductPriceAccordion-{{ section.id }}"{% endif %}
+      class="details"
+      data-testid="accordion-details"
+      {% if block_settings.open_by_default %}
+        open
+      {% endif %}
+      {{ block.shopify_attributes }}
+    >
+      <summary class="details__header">
+        {% render 'icon-or-image',
+          icon: block_settings.icon,
+          image_upload: block_settings.image_upload,
+          width: block_settings.width,
+          class_name: 'details__icon'
+        %}
+        {{ block_settings.heading }}
+        <span class="svg-wrapper icon-caret icon-animated">
+          {{- 'icon-caret.svg' | inline_asset_content -}}
+        </span>
+        <span class="svg-wrapper icon-plus">
+          {{- 'icon-plus.svg' | inline_asset_content -}}
+        </span>
+      </summary>
+
+      <div class="details-content">
+        {{ row_content }}
+      </div>
+    </details>
+  {% endcapture %}
+  {% render 'accordion-custom-component',
+    children: accordion_row_children,
+    open_by_default_on_desktop: block_settings.open_by_default,
+    open_by_default_on_mobile: block_settings.open_by_default
+  %}
+{%- endif -%}
+
+{% stylesheet %}
+  details[id^='ProductPriceAccordion-'] { scroll-margin-top: calc(var(--header-group-height, 0px) + 24px); }
+{% endstylesheet %}
 
 {% schema %}
 {

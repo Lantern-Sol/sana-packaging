@@ -3,6 +3,7 @@
 
   @param {object} swatch - a swatch object
   @param {object} [variant_image] - an alternate image when there is no swatch value
+  @param {boolean} [force_variant_image] - use variant_image even when the `show_variant_image` theme setting is off
   @param {string} [mode] - one of 'unscaled', 'filter', 'pill'
   @param {string} [label] - visually-hidden accessible label for the swatch (e.g. the color name)
 
@@ -13,8 +14,14 @@
 {% liquid
   assign swatch_value = null
   assign extra_classes = ''
-  if settings.show_variant_image and variant_image
-    assign swatch_image_width = settings.variant_swatch_width | times: 2
+  assign use_variant_image = settings.show_variant_image
+  if force_variant_image
+    assign use_variant_image = true
+  endif
+  if use_variant_image and variant_image
+    # Floor the request so surfaces that render the swatch larger than the theme's swatch
+    # width setting (the PDP colour tiles are 52 x 65) still get a sharp image.
+    assign swatch_image_width = settings.variant_swatch_width | at_least: 64 | times: 2
     assign swatch_image_url = variant_image | image_url: width: swatch_image_width
     assign swatch_value = 'url(' | append: swatch_image_url | append: ')'
     assign extra_classes = extra_classes | append: ' swatch--variant-image'

@@ -1,0 +1,258 @@
+{%- doc -%}
+  Artwork template download panel for the PDP "Customization" accordion row —
+  Figma 2123:397.
+
+  A Teal/50 card holding a centred prompt and up to two outline pill buttons.
+  Each button's href prefers a product metafield so the files can differ per
+  product, and falls back to the block setting.
+{%- enddoc -%}
+
+{%- liquid
+  assign block_settings = block.settings
+  assign product_ref = closest.product
+
+  assign label_metafield = product_ref.metafields.custom.label_template_url
+  assign print_metafield = product_ref.metafields.custom.direct_print_template_url
+  assign label_url = label_metafield | default: block_settings.label_template_link
+  assign print_url = print_metafield | default: block_settings.print_template_link
+
+  assign heading = block_settings.heading | replace: '[product]', product_ref.title
+
+  assign has_buttons = false
+  if label_url != blank or print_url != blank
+    assign has_buttons = true
+  elsif block_settings.show_sample_content or request.visual_preview_mode or request.design_mode
+    assign has_buttons = true
+    assign show_placeholder = true
+  endif
+-%}
+
+{%- if has_buttons -%}
+  <div
+    class="template-downloads spacing-style"
+    style="{% render 'spacing-style', settings: block_settings %}"
+    {{ block.shopify_attributes }}
+  >
+    {%- if heading != blank -%}
+      <p class="template-downloads__heading">{{ heading }}</p>
+    {%- endif -%}
+
+    <div class="template-downloads__actions">
+      {%- if label_url != blank or show_placeholder -%}
+        <a
+          class="template-downloads__button"
+          href="{{ label_url | default: '#' }}"
+          {% if block_settings.open_in_new_tab %}
+            target="_blank"
+            rel="noopener noreferrer"
+          {% endif %}
+        >
+          {{- block_settings.label_template_label | escape -}}
+          <span class="template-downloads__icon" aria-hidden="true">
+            {{- 'icon-download.svg' | inline_asset_content -}}
+          </span>
+        </a>
+      {%- endif -%}
+
+      {%- if print_url != blank or show_placeholder -%}
+        <a
+          class="template-downloads__button"
+          href="{{ print_url | default: '#' }}"
+          {% if block_settings.open_in_new_tab %}
+            target="_blank"
+            rel="noopener noreferrer"
+          {% endif %}
+        >
+          {{- block_settings.print_template_label | escape -}}
+          <span class="template-downloads__icon" aria-hidden="true">
+            {{- 'icon-download.svg' | inline_asset_content -}}
+          </span>
+        </a>
+      {%- endif -%}
+    </div>
+  </div>
+{%- endif -%}
+
+{% stylesheet %}
+  .template-downloads {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    width: 100%;
+    padding: 20px;
+    border-radius: 16px;
+    color: #064c4d;
+    background: #f0fdfa;
+  }
+
+  /* Body/Default/Medium — 16/500/1.5. */
+  .template-downloads__heading {
+    width: 100%;
+    margin: 0;
+    font-family: var(--font-body--family);
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.5;
+    text-align: center;
+  }
+
+  .template-downloads__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  /* Figma "Button/Primary SM" outline — UI/Button/Small on an 80px pill. */
+  .template-downloads__button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    height: 38px;
+    padding-inline: 20px;
+    border: 1px solid #064c4d;
+    border-radius: 80px;
+    color: #064c4d;
+    background: transparent;
+    font-family: var(--font-body--family);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: normal;
+    letter-spacing: 0.02em;
+    text-align: center;
+    text-decoration: none;
+    white-space: nowrap;
+    transition:
+      color var(--animation-speed) var(--animation-easing),
+      background-color var(--animation-speed) var(--animation-easing);
+  }
+
+  .template-downloads__button:is(:hover, :focus-visible) {
+    color: #fff;
+    background: #064c4d;
+  }
+
+  .template-downloads__icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+  }
+
+  .template-downloads__icon svg {
+    display: block;
+    width: 18px;
+    height: 18px;
+  }
+
+  @media screen and (max-width: 749px) {
+    .template-downloads__actions {
+      flex-direction: column;
+      width: 100%;
+    }
+
+    .template-downloads__button {
+      width: 100%;
+    }
+  }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Template Downloads",
+  "tag": null,
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Links prefer the 'label_template_url' and 'direct_print_template_url' product metafields (custom namespace) and fall back to the links set here."
+    },
+    {
+      "type": "inline_richtext",
+      "id": "heading",
+      "label": "Heading",
+      "info": "Use [product] to insert the product title.",
+      "default": "Download the [product] label templates:"
+    },
+    {
+      "type": "header",
+      "content": "Label template"
+    },
+    {
+      "type": "text",
+      "id": "label_template_label",
+      "label": "Button label",
+      "default": "Label Template"
+    },
+    {
+      "type": "url",
+      "id": "label_template_link",
+      "label": "Fallback link"
+    },
+    {
+      "type": "header",
+      "content": "Direct print template"
+    },
+    {
+      "type": "text",
+      "id": "print_template_label",
+      "label": "Button label",
+      "default": "Direct Print Template"
+    },
+    {
+      "type": "url",
+      "id": "print_template_link",
+      "label": "Fallback link"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_sample_content",
+      "label": "Show the panel without links",
+      "info": "Renders the panel with placeholder buttons when neither the metafields nor the fallback links are set. Turn this off once real files are in place — the theme editor always shows it.",
+      "default": false
+    },
+    {
+      "type": "header",
+      "content": "t:content.layout"
+    },
+    {
+      "type": "checkbox",
+      "id": "open_in_new_tab",
+      "label": "t:settings.open_new_tab",
+      "default": true
+    },
+    {
+      "type": "header",
+      "content": "t:content.padding"
+    },
+    {
+      "type": "range",
+      "id": "padding-block-start",
+      "label": "t:settings.top",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding-block-end",
+      "label": "t:settings.bottom",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 0
+    }
+  ],
+  "presets": [
+    {
+      "name": "Template Downloads",
+      "category": "t:categories.product"
+    }
+  ]
+}
+{% endschema %}

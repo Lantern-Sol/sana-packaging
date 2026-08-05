@@ -1,5 +1,22 @@
 {% assign block_settings = block.settings %}
 
+{%- capture accordion_rows -%}
+  {% content_for 'blocks' %}
+{%- endcapture -%}
+
+{% liquid
+  # Rows remove themselves when the product has nothing to put in them. Once every row has
+  # gone the wrapper would still paint its dividers, border and padding around nothing, so
+  # the accordion goes with them. The editor always renders, so rows stay reachable there.
+  assign accordion_rows_stripped = accordion_rows | strip
+
+  assign render_accordion = false
+  if accordion_rows_stripped != blank or request.design_mode or request.visual_preview_mode
+    assign render_accordion = true
+  endif
+%}
+
+{%- if render_accordion -%}
 {% render 'contrast-override',
   background_color: block_settings.background_color,
   text_color: block_settings.text_color,
@@ -40,10 +57,11 @@
   "
   {{ block.shopify_attributes }}
 >
-  {% content_for 'blocks' %}
+  {{ accordion_rows }}
 </div>
 
 {% render 'accordion-styles' %}
+{%- endif -%}
 
 {% stylesheet %}
   /* Card rows: each row becomes its own surface instead of one divided list. */

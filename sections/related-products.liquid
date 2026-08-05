@@ -1,0 +1,1132 @@
+{%- comment -%}
+  Sana "Related Products" — Figma 2123:469 (desktop, 1440) / 2123:1892 (mobile, 390).
+
+  A full-bleed teal-gradient band with a heading row, a product carousel whose track
+  starts at the page gutter and runs off the right edge, and the slider arrows below it.
+
+  Every measurement is expressed in rem. `html { font-size }` is pinned to 100vw/1440
+  between 750px and 1440px and to 100vw/393 below 750px (see theme-styles-variables),
+  so `N / 16` rem renders as exactly N Figma pixels at both design anchors and scales
+  proportionally in between. The Figma px value is noted next to each one.
+
+  Recommendations are fetched by <product-recommendations> (product-recommendations.js),
+  which re-requests this section through the Section Rendering API and morphs the
+  subtree carrying data-hydration-key back in.
+{%- endcomment -%}
+
+<script
+  src="{{ 'product-recommendations.js' | asset_url }}"
+  type="module"
+  fetchpriority="low"
+></script>
+
+{%- liquid
+  assign source_product = section.settings.product | default: product
+  assign max_products = section.settings.max_products
+
+  assign has_products = false
+
+  if recommendations.performed or source_product == blank
+    if source_product == blank
+      # Onboarding / non-product context: render placeholder cards so the layout is
+      # reviewable in the theme editor.
+      assign products = null
+      for i in (1..max_products)
+        assign products = products | append: ', '
+        assign products = products | split: ','
+      endfor
+    elsif recommendations.performed and recommendations.products_count == 0
+      # Shopify found nothing to recommend — fall back to the catalogue for "related",
+      # and show nothing for "complementary" (an arbitrary product is not a pairing).
+      if section.settings.recommendation_type == 'related'
+        assign products = collections.all.products | reject: 'id', source_product.id
+      else
+        assign products = null
+      endif
+    else
+      assign products = recommendations.products
+    endif
+
+    assign slide_count = products.size
+    if slide_count > max_products
+      assign slide_count = max_products
+    endif
+
+    if slide_count > 0
+      assign has_products = true
+    endif
+  endif
+-%}
+
+{%- capture related_products_content -%}
+  <div class="related-products__background">
+    {%- if section.settings.background_image != blank -%}
+      {{
+        section.settings.background_image
+        | image_url: width: 2400
+        | image_tag:
+          loading: 'lazy',
+          class: 'related-products__texture',
+          widths: '750, 1100, 1500, 2000, 2400',
+          sizes: '100vw',
+          alt: ''
+      }}
+    {%- endif -%}
+  </div>
+
+  <div
+    class="
+      section
+      section--full-width
+      related-products__inner
+      spacing-style
+    "
+    style="
+      {% render 'spacing-style', settings: section.settings %}
+      --rp-gutter-desktop: {{ section.settings.horizontal_padding | divided_by: 16.0 }}rem;
+      --rp-gutter-mobile: {{ section.settings.horizontal_padding_mobile | divided_by: 16.0 }}rem;
+      --rp-gap-desktop: {{ section.settings.gap | divided_by: 16.0 }}rem;
+      --rp-gap-mobile: {{ section.settings.gap_mobile | divided_by: 16.0 }}rem;
+      --rp-arrow-icon: url('{{ 'icon-arrow-top-right-small.svg' | asset_url }}');
+      --rp-plus-icon: url('{{ 'icon-cart-plus.svg' | asset_url }}');
+    "
+  >
+    <div class="related-products__header">
+      {%- if section.settings.heading != blank -%}
+        <h2 class="related-products__heading">{{ section.settings.heading | escape }}</h2>
+      {%- endif -%}
+
+      {%- if section.settings.button_label != blank -%}
+        <a
+          class="related-products__cta button-fill"
+          {% if section.settings.button_link == blank %}
+            role="link"
+            aria-disabled="true"
+          {% else %}
+            href="{{ section.settings.button_link }}"
+          {% endif %}
+        >
+          <span class="related-products__cta-label related-products__cta-label--desktop">
+            {{- section.settings.button_label | escape -}}
+          </span>
+          <span class="related-products__cta-label related-products__cta-label--mobile">
+            {{- section.settings.button_label_mobile | default: section.settings.button_label | escape -}}
+          </span>
+        </a>
+      {%- endif -%}
+    </div>
+
+    {%- if has_products -%}
+      {%- capture slides -%}
+        {%- for product in products limit: max_products -%}
+          {%- capture card -%}
+            {% render 'related-product-card',
+              product: product,
+              section_id: section.id,
+              index: forloop.index0,
+              view_label: section.settings.view_label,
+              add_label: section.settings.add_label
+            %}
+          {%- endcapture -%}
+          {% render 'slideshow-slide',
+            index: forloop.index0,
+            class: 'related-products__slide',
+            children: card
+          %}
+        {%- endfor -%}
+      {%- endcapture -%}
+
+      {%- capture nav -%}
+        <div class="related-products__nav">
+          <button
+            class="related-products__arrow related-products__arrow--previous"
+            type="button"
+            aria-label="{{ 'accessibility.slideshow_previous' | t }}"
+            on:click="/previous"
+            ref="previous"
+          >
+            <span class="svg-wrapper">{{- 'icon-angle-right.svg' | inline_asset_content -}}</span>
+          </button>
+          <button
+            class="related-products__arrow related-products__arrow--next"
+            type="button"
+            aria-label="{{ 'accessibility.slideshow_next' | t }}"
+            on:click="/next"
+            ref="next"
+          >
+            <span class="svg-wrapper">{{- 'icon-angle-right.svg' | inline_asset_content -}}</span>
+          </button>
+        </div>
+      {%- endcapture -%}
+
+      {% render 'slideshow',
+        ref: 'relatedProducts',
+        class: 'related-products__carousel',
+        slides: slides,
+        slide_count: slide_count,
+        show_arrows: false,
+        infinite: false,
+        auto_hide_controls: false,
+        initial_slide: 0,
+        slideshow_gutters: 'start',
+        controls: nav
+      %}
+    {%- elsif recommendations.performed == false -%}
+      {%- comment -%}
+        Pre-hydration placeholder. Mirrors the card footprint so the swap-in does not
+        move the rest of the page.
+      {%- endcomment -%}
+      <div
+        class="related-products__skeleton"
+        aria-label="{{ 'accessibility.loading_product_recommendations' | t }}"
+      >
+        {%- for i in (1..max_products) -%}
+          <div class="related-products__skeleton-card"></div>
+        {%- endfor -%}
+      </div>
+    {%- endif -%}
+  </div>
+{%- endcapture -%}
+
+{%- comment -%}
+  Only mount the fetching custom element when there is a product to recommend against.
+  product-recommendations.js throws outright on a missing data-product-id, so the
+  onboarding state (section dropped on a non-product template) uses a plain wrapper.
+{%- endcomment -%}
+{%- if source_product == blank -%}
+  <div
+    class="related-products"
+    data-testid="related-products-section"
+    {{ section.shopify_attributes }}
+  >
+    {{ related_products_content }}
+  </div>
+{%- else -%}
+  <product-recommendations
+    id="RelatedProducts-{{ section.id }}"
+    class="related-products"
+    data-url="{{ routes.product_recommendations_url }}?limit={{ max_products }}"
+    data-section-id="{{ section.id }}"
+    data-product-id="{{ source_product.id }}"
+    data-intent="{{ section.settings.recommendation_type }}"
+    data-recommendations-performed="{{ recommendations.performed }}"
+    data-hydration-key="related-products-{{ section.id }}"
+    data-testid="related-products-section"
+    {{ section.shopify_attributes }}
+  >
+    {{ related_products_content }}
+  </product-recommendations>
+{%- endif -%}
+
+{% stylesheet %}
+  /* ------------------------------------------------------------------ *
+   * Section shell
+   * ------------------------------------------------------------------ */
+  .related-products {
+    /* Figma: 80px gutter / 48px row gap / 344px card / 32px card gap / 55px arrow */
+    --rp-gutter: var(--rp-gutter-desktop, 5rem);
+    --rp-gap: var(--rp-gap-desktop, 3rem);
+    --rp-card-width: 21.5rem;
+    --rp-card-gap: 2rem;
+    --rp-card-radius: 1.5rem;
+    --rp-arrow-size: 3.4375rem;
+    /* Deliberately past --hover-subtle-zoom-amount (1.015): that value is tuned for the
+       small cards in a product grid and is invisible on a 344 x 430 image. */
+    --rp-image-zoom: 1.06;
+    --rp-image-zoom-speed: 0.45s;
+
+    position: relative;
+    display: block;
+    color: #fff;
+  }
+
+  /*
+    The gradient is painted on a dedicated layer rather than on .section, because the
+    texture has to multiply into it at 80% opacity — `background-blend-mode` alone
+    cannot express the opacity, and .section is transparent by theme convention.
+    Figma reads the stops left-to-right down the 186.23deg axis.
+  */
+  .related-products__background {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    isolation: isolate;
+    background-color: var(--color-teal-800);
+    background-image: linear-gradient(
+      186.23deg,
+      var(--color-teal-500) 1.59%,
+      var(--color-teal-700) 29.74%,
+      var(--color-teal-800) 56.45%,
+      var(--color-teal-900) 96.97%
+    );
+  }
+
+  .related-products__texture {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.8;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+  }
+
+  .related-products .related-products__inner {
+    position: relative;
+    z-index: 1;
+    row-gap: var(--rp-gap);
+
+    /*
+      The gutter is the section's own (80px in Figma, wider than the theme's 50px page
+      margin), and the carousel has to bleed past it on the right — so horizontal
+      padding is applied per row below, not to the grid container.
+    */
+    padding-inline: 0;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Header row — heading + "View All Products" pill
+   * ------------------------------------------------------------------ */
+  .related-products__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-inline: var(--rp-gutter);
+  }
+
+  /* Figma Headling/H3 — 36px/1.2 desktop, 24px/1.1 mobile. Both already live in the
+     theme's h3 preset, which is re-valued for mobile in theme-styles-variables. */
+  .related-products .related-products__heading {
+    margin: 0;
+    color: #fff;
+    font-family: var(--font-h3--family);
+    font-style: var(--font-h3--style);
+    font-size: var(--font-h3--size);
+    font-weight: var(--font-h3--weight);
+    line-height: var(--font-h3--line-height);
+    letter-spacing: var(--font-h3--letter-spacing);
+    text-transform: var(--font-h3--case);
+  }
+
+  /* Figma Button/Secondary/M/outline. .button-fill opts the pill into the theme's
+     shared radial hover wipe, which needs both fill variables set explicitly. */
+  .related-products .related-products__cta {
+    --button-fill-color: #fff;
+    --button-fill-under: transparent;
+
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem; /* 10px */
+    padding: 0.875rem 1.75rem; /* 14px 28px */
+    border: 1px solid #fff;
+    border-radius: 5rem; /* 80px */
+    color: #fff;
+    background-color: transparent;
+    font-family: var(--font-subheading--family);
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: normal;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .related-products .related-products__cta:is(:hover, :focus-visible) {
+    color: var(--color-teal-900);
+  }
+
+  .related-products .related-products__cta[aria-disabled='true'] {
+    cursor: default;
+  }
+
+  /*
+    A 15px window over a 24px-wide mask leaves the 10px glyph fully visible with the
+    Figma padding around it — the same recipe the hero slide and CTA banner use.
+  */
+  .related-products .related-products__cta::after {
+    content: '';
+    flex-shrink: 0;
+    width: 0.9375rem; /* 15px */
+    height: 0.9375rem;
+    background-color: currentcolor;
+    mask: var(--rp-arrow-icon) center / 0.78125rem 0.78125rem no-repeat;
+    transition: var(--button-arrow-transition);
+  }
+
+  .related-products .related-products__cta:is(:hover, :focus-visible)::after {
+    transform: var(--button-arrow-hover-transform);
+  }
+
+  .related-products__cta-label--mobile {
+    display: none;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Carousel — track starts at the gutter, runs off the right edge
+   * ------------------------------------------------------------------ */
+  .related-products__carousel {
+    --gutter-slide-width: var(--rp-gutter);
+    --slideshow-gap: var(--rp-card-gap);
+
+    row-gap: var(--rp-gap);
+  }
+
+  /* slideshow-container paints --color-background by default, which would cover the
+     section gradient. */
+  .related-products .related-products__carousel slideshow-container {
+    background: transparent;
+  }
+
+  .related-products .related-products__carousel slideshow-slides {
+    align-items: stretch;
+  }
+
+  /*
+    `flex` has to be restated, not just `--slide-width`: base.css carries a second
+    `slideshow-slide` rule (`flex: 0 0 calc(100% / var(--slides-per-view, 1))`) for
+    slideshows that divide the viewport into N equal slides. Its flex-basis wins over
+    any `width`, so a card-sized slide has to set the basis itself.
+  */
+  .related-products .related-products__slide {
+    --slide-width: var(--rp-card-width);
+
+    display: flex;
+    width: var(--rp-card-width);
+    flex: 0 0 var(--rp-card-width);
+    max-height: none;
+    height: auto;
+    overflow: visible;
+    scroll-snap-align: start;
+    /* The track holds at most a handful of cards and each one carries a form, so the
+       deferred-rendering default buys nothing and risks zero-height peeking slides. */
+    content-visibility: visible;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Card
+   * ------------------------------------------------------------------ */
+  .related-card {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: 1.5rem; /* 24px */
+    padding-block-end: 1.5rem;
+    border-radius: var(--rp-card-radius);
+    background: var(--color-teal-800);
+    overflow: hidden;
+  }
+
+  .related-card__media {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    aspect-ratio: 4 / 5; /* Figma 400 x 500 */
+    padding: 2rem; /* 32px */
+    border-radius: var(--rp-card-radius) var(--rp-card-radius) 0 0;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  /*
+    Image and scrim sit at z-index -1 rather than above the flow. .related-card__media
+    isolates, so they still paint over the card's own surface — and leaving the meta
+    block unpositioned keeps the media as the containing block for the title's stretched
+    ::after, which is what makes the whole image clickable.
+  */
+  .related-card__image {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .related-card__image--placeholder {
+    display: block;
+    background: var(--color-sand-100);
+  }
+
+  .related-card__image--placeholder svg {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /*
+    Hover zoom. Only the photograph moves — the scrim, title and "View Product" stay put,
+    so the crop reads as a fixed window onto a moving image. .related-card__media already
+    clips, so nothing escapes the rounded top corners.
+
+    Guarded exactly the way base.css guards its own card hover effects: precise pointers
+    only, so a tap on touch does not leave a stuck zoom, and never against a reduced-motion
+    preference.
+  */
+  @media (any-pointer: fine) and (prefers-reduced-motion: no-preference) {
+    .related-card__image {
+      transition: transform var(--rp-image-zoom-speed) var(--hover-transition-timing);
+    }
+
+    /*
+      Hover is card-wide, matching the theme's own `.product-card:hover .product-card__image`.
+      The keyboard equivalent is scoped to the media instead — the product link is the only
+      focusable thing in there, so tabbing onto the quantity stepper or Add to Cart does not
+      set the photo moving.
+    */
+    .related-card:hover .related-card__image,
+    .related-card__media:focus-within .related-card__image {
+      transform: scale(var(--rp-image-zoom));
+    }
+  }
+
+  /* Same layer as the image and later in source order, so it multiplies over it. */
+  .related-card__scrim {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    mix-blend-mode: multiply;
+    background: linear-gradient(192.29deg, rgb(20 107 104 / 0) 29.08%, rgb(20 107 104 / 0.9) 89.43%);
+    pointer-events: none;
+  }
+
+  .related-card__meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.875rem; /* 14px */
+  }
+
+  /* Figma Headling/H4 — 24px/1.25. Unlike the section heading this does NOT drop to
+     20px on mobile: the mobile card keeps the 24px size (Figma 2123:1899). */
+  .related-products .related-card__title {
+    margin: 0;
+    color: #fff;
+    font-family: var(--font-h4--family);
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .related-card__link {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Stretch the title link over the whole media so the image is clickable without a
+     second, duplicate link in the accessibility tree. */
+  .related-card__link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+  }
+
+  .related-card__view {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem; /* 10px */
+    color: #fff;
+    font-family: var(--font-subheading--family);
+    font-size: 0.875rem; /* 14px */
+    font-weight: 600;
+    line-height: normal;
+    letter-spacing: 0.02em;
+  }
+
+  /* 10px box over a 10px mask: the glyph occupies 8 of the icon's 10 viewBox units,
+     so it lands at the Figma 8px. */
+  .related-card__view::after {
+    content: '';
+    flex-shrink: 0;
+    width: 0.625rem;
+    height: 0.625rem;
+    background-color: currentcolor;
+    mask: var(--rp-arrow-icon) center / 0.625rem 0.625rem no-repeat;
+    transition: var(--button-arrow-transition);
+  }
+
+  .related-card:hover .related-card__view::after {
+    transform: var(--button-arrow-hover-transform);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Card buy row — quantity stepper + Add to Cart
+   * ------------------------------------------------------------------ */
+  /*
+    slideshow-slides sets `cursor: var(--cursor)` (grab) on the track and it inherits all
+    the way down into the card, so the buy row would advertise a drag handle over controls
+    that are deliberately excluded from the drag gesture (data-slideshow-no-drag on the
+    element below). Reset it here and let the buttons' own `cursor: pointer` come through.
+  */
+  .related-products .related-card__actions {
+    display: block;
+    width: 100%;
+    cursor: auto;
+  }
+
+  .related-products .related-card__quantity :is(.quantity-minus, .quantity-plus),
+  .related-products .related-card__atc {
+    cursor: pointer;
+  }
+
+  .related-products .related-card__actions form {
+    display: block;
+    width: 100%;
+  }
+
+  .related-card__buy {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem; /* 16px */
+  }
+
+  .related-products .related-card__error {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-block-start: 0.5rem;
+    padding-inline: 1rem;
+    color: #fff;
+    font-size: 0.75rem;
+    text-align: center;
+  }
+
+  .related-products .related-card__error.hidden {
+    display: none;
+  }
+
+  .related-products .related-card__quantity-wrapper {
+    display: block;
+    width: auto;
+    gap: 0;
+  }
+
+  /* Volume pricing would otherwise inject a "at $x / ea" line into the buy row. */
+  .related-products .related-card__quantity-wrapper .price-per-item {
+    display: none;
+  }
+
+  /*
+    Figma 2123:482 — 1px Teal/300 pill, 24px gap between the chevrons and the value.
+    Selectors are scoped under .related-products so they outrank the .quantity-selector
+    rules in base.css, which is emitted after this stylesheet.
+  */
+  .related-products .related-card__quantity {
+    --quantity-selector-width: auto;
+
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    align-self: auto;
+    /*
+      Figma is 24px from each chevron to a value box hugged to the 7px width of "1".
+      A real input has to stay legible at two digits, so the box is widened to 24px and
+      the gap pulled back by the 7px of slack that adds — the chevron-to-digit distance
+      still reads as the designed 24px.
+    */
+    gap: 1.0625rem; /* 17px */
+    height: auto;
+    min-height: 0;
+    padding: 0.5rem 1.25rem; /* 8px 20px */
+    border: 1px solid var(--color-teal-300);
+    border-radius: 1.5rem;
+    color: #fff;
+    background: transparent;
+  }
+
+  .related-products .related-card__quantity input[type='number'] {
+    width: 1.5rem; /* fits two digits — see the gap note above */
+    min-width: 0;
+    max-width: none;
+    height: 1.4375rem; /* 23px */
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    color: #fff;
+    background: transparent;
+    font-family: var(--font-subheading--family);
+    font-size: 1.125rem; /* 18px */
+    font-weight: 600;
+    line-height: 1.4375rem;
+    text-align: center;
+  }
+
+  .related-products .related-card__quantity :is(.quantity-minus, .quantity-plus) {
+    position: relative;
+    width: 0.4375rem; /* 7px */
+    height: 0.8rem; /* 12.83px */
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    border-radius: 0;
+    color: inherit;
+  }
+
+  /* Restore a usable tap target without disturbing the 7 x 12.8 Figma box. */
+  .related-products .related-card__quantity :is(.quantity-minus, .quantity-plus)::after {
+    content: '';
+    position: absolute;
+    inset: -0.75rem -0.625rem;
+  }
+
+  .related-products .related-card__quantity :is(.quantity-minus, .quantity-plus):disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .related-products .related-card__quantity .svg-wrapper,
+  .related-products .related-card__quantity svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .related-products .related-card__quantity .quantity-minus .svg-wrapper {
+    transform: rotate(180deg);
+  }
+
+  .related-products add-to-cart-component {
+    display: flex;
+    flex: 0 0 auto;
+  }
+
+  /* Figma 2123:488 — Teal/300 pill, Teal/900 label, trailing 14px plus. */
+  .related-products .related-card__atc {
+    --button-fill-color: #fff;
+    --button-fill-under: var(--color-teal-300);
+
+    display: inline-flex;
+    width: 10.5rem; /* 168px */
+    /* buy-buttons-styles gives every .add-to-cart-button the tall PDP buy-button height;
+       this pill is sized by its padding instead. */
+    height: auto;
+    min-height: 0;
+    align-items: center;
+    align-content: center;
+    justify-content: center;
+    padding: 0.625rem 1.25rem; /* 10px 20px */
+    border: 0;
+    border-radius: 5rem;
+    outline: none;
+    box-shadow: none;
+    color: var(--color-teal-900);
+    background-color: var(--color-teal-300);
+    font-family: var(--font-subheading--family);
+    font-size: 0.875rem; /* 14px */
+    font-weight: 600;
+    line-height: normal;
+    letter-spacing: 0.02em;
+    text-align: center;
+  }
+
+  .related-products .related-card__atc:is(:hover, :focus-visible) {
+    color: var(--color-teal-900);
+  }
+
+  /*
+    The plus hangs off .add-to-cart-text rather than off the button, so it travels with
+    the label: adding to cart slides and fades .add-to-cart-text out to clear the pill for
+    the checkmark burst, and a plus pinned to the button itself would be stranded on an
+    otherwise empty button. Same arrangement as the PDP's own Add to cart (_product-details).
+  */
+  .related-products .related-card__atc .add-to-cart-text {
+    gap: 0;
+  }
+
+  .related-products .related-card__atc .add-to-cart-text::after {
+    content: '';
+    flex-shrink: 0;
+    width: 0.875rem; /* 14px */
+    height: 0.875rem;
+    margin-inline-start: 0.625rem; /* 10px */
+    background-color: currentcolor;
+    mask: var(--rp-plus-icon) center / 0.875rem 0.875rem no-repeat;
+  }
+
+  /* The burst is authored for the 48px PDP button; this pill is ~37px, so it needs to
+     come down a size to keep clear of the rounded ends. */
+  .related-products .related-card__atc .add-to-cart__added-icon {
+    width: 1.5rem; /* 24px */
+    height: 1.5rem;
+  }
+
+  /* The placeholder card has no form, so its controls are inert spans. */
+  .related-products .related-card__quantity--static {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 4.5rem;
+    padding: 0.5rem 1.25rem;
+    border: 1px solid var(--color-teal-300);
+    border-radius: 1.5rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.4375rem;
+  }
+
+  .related-card--placeholder .related-card__atc {
+    pointer-events: none;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Slider navigation
+   * ------------------------------------------------------------------ */
+  .related-products__nav {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.75rem; /* 12px */
+    padding-inline: var(--rp-gutter);
+  }
+
+  .related-products .related-products__arrow {
+    display: flex;
+    width: var(--rp-arrow-size);
+    height: var(--rp-arrow-size);
+    min-width: 0;
+    min-height: 0;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    appearance: none;
+    color: #fff;
+    /* Figma: Teal/600 at 50% */
+    background-color: rgb(43 139 131 / 0.5);
+    cursor: pointer;
+    transition: background-color var(--animation-speed) var(--animation-easing),
+      opacity var(--animation-speed) var(--animation-easing);
+  }
+
+  .related-products .related-products__arrow:is(:hover, :focus-visible) {
+    background-color: rgb(43 139 131 / 0.85);
+  }
+
+  .related-products .related-products__arrow[disabled] {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .related-products .related-products__arrow .svg-wrapper {
+    display: block;
+    width: 0.8125rem; /* 13px */
+    height: 1.5rem; /* 24px */
+  }
+
+  .related-products .related-products__arrow svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .related-products .related-products__arrow--previous .svg-wrapper {
+    transform: rotate(180deg);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Pre-hydration skeleton
+   * ------------------------------------------------------------------ */
+  .related-products__skeleton {
+    display: flex;
+    gap: var(--rp-card-gap);
+    padding-inline-start: var(--rp-gutter);
+    overflow: hidden;
+  }
+
+  .related-products__skeleton-card {
+    width: var(--rp-card-width);
+    flex-shrink: 0;
+    /* Media (4:5) + 24px gap + 41px buy row + 24px bottom padding at a 344px card. */
+    aspect-ratio: 344 / 519;
+    border-radius: var(--rp-card-radius);
+    background: rgb(255 255 255 / 0.06);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Mobile — Figma 2123:1892 (390px frame, 393px rem anchor)
+   * ------------------------------------------------------------------ */
+  @media screen and (max-width: 749px) {
+    .related-products {
+      --rp-gutter: var(--rp-gutter-mobile, 1rem);
+      --rp-gap: var(--rp-gap-mobile, 2rem);
+      --rp-card-width: 20.1875rem; /* 323px */
+      --rp-card-gap: 1rem;
+      --rp-arrow-size: 2.5rem; /* 40px */
+    }
+
+    .related-products__background {
+      background-image: linear-gradient(
+        196.96deg,
+        var(--color-teal-500) 1.59%,
+        var(--color-teal-700) 29.74%,
+        var(--color-teal-800) 56.45%,
+        var(--color-teal-900) 96.97%
+      );
+    }
+
+    /* Figma Button/Primary SM */
+    .related-products .related-products__cta {
+      gap: 0.5rem; /* 8px */
+      padding: 0.625rem 1rem; /* 10px 16px */
+      font-size: 0.875rem;
+    }
+
+    .related-products .related-products__cta::after {
+      width: 0.625rem; /* 10px */
+      height: 0.625rem;
+      mask-size: 0.625rem 0.625rem;
+    }
+
+    .related-products__cta-label--desktop {
+      display: none;
+    }
+
+    .related-products__cta-label--mobile {
+      display: inline;
+    }
+
+    .related-card__media {
+      padding: 2rem 1.5rem; /* 32px 24px */
+    }
+
+    .related-products .related-card__atc {
+      width: 9.25rem; /* 148px */
+    }
+
+    .related-products__nav {
+      justify-content: center;
+    }
+  }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Related products",
+  "disabled_on": {
+    "groups": ["header", "footer"]
+  },
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Related Products"
+    },
+    {
+      "type": "product",
+      "id": "product",
+      "label": "t:settings.product"
+    },
+    {
+      "type": "select",
+      "id": "recommendation_type",
+      "label": "t:settings.type",
+      "options": [
+        {
+          "value": "related",
+          "label": "t:options.related"
+        },
+        {
+          "value": "complementary",
+          "label": "t:options.complementary"
+        }
+      ],
+      "default": "related"
+    },
+    {
+      "type": "range",
+      "id": "max_products",
+      "label": "t:settings.product_count",
+      "min": 2,
+      "max": 12,
+      "step": 1,
+      "default": 8
+    },
+    {
+      "type": "header",
+      "content": "Button"
+    },
+    {
+      "type": "text",
+      "id": "button_label",
+      "label": "Label",
+      "default": "View All Products"
+    },
+    {
+      "type": "text",
+      "id": "button_label_mobile",
+      "label": "Mobile label",
+      "default": "View All"
+    },
+    {
+      "type": "url",
+      "id": "button_link",
+      "label": "Link"
+    },
+    {
+      "type": "header",
+      "content": "Cards"
+    },
+    {
+      "type": "text",
+      "id": "view_label",
+      "label": "View product label",
+      "default": "View Product"
+    },
+    {
+      "type": "text",
+      "id": "add_label",
+      "label": "Add to cart label",
+      "default": "Add to Cart"
+    },
+    {
+      "type": "header",
+      "content": "Background"
+    },
+    {
+      "type": "image_picker",
+      "id": "background_image",
+      "label": "Background texture",
+      "info": "Multiplied over the teal gradient at 80% opacity, as in the design."
+    },
+    {
+      "type": "header",
+      "content": "t:content.section_layout"
+    },
+    {
+      "type": "range",
+      "id": "gap",
+      "label": "t:settings.gap",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 48
+    },
+    {
+      "type": "range",
+      "id": "gap_mobile",
+      "label": "Mobile gap",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 32
+    },
+    {
+      "type": "range",
+      "id": "horizontal_padding",
+      "label": "Horizontal padding",
+      "min": 0,
+      "max": 200,
+      "step": 4,
+      "unit": "px",
+      "default": 80
+    },
+    {
+      "type": "range",
+      "id": "horizontal_padding_mobile",
+      "label": "Mobile horizontal padding",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "header",
+      "content": "t:content.padding"
+    },
+    {
+      "type": "range",
+      "id": "padding-block-start",
+      "label": "t:settings.top",
+      "min": 0,
+      "max": 200,
+      "step": 4,
+      "unit": "px",
+      "default": 120
+    },
+    {
+      "type": "range",
+      "id": "padding-block-end",
+      "label": "t:settings.bottom",
+      "min": 0,
+      "max": 200,
+      "step": 4,
+      "unit": "px",
+      "default": 120
+    },
+    {
+      "type": "header",
+      "content": "Mobile padding"
+    },
+    {
+      "type": "checkbox",
+      "id": "use_mobile_padding",
+      "label": "Use mobile padding",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "padding-block-start-mobile",
+      "label": "t:settings.top",
+      "min": 0,
+      "max": 200,
+      "step": 4,
+      "unit": "px",
+      "default": 48,
+      "visible_if": "{{ section.settings.use_mobile_padding }}"
+    },
+    {
+      "type": "range",
+      "id": "padding-block-end-mobile",
+      "label": "t:settings.bottom",
+      "min": 0,
+      "max": 200,
+      "step": 4,
+      "unit": "px",
+      "default": 48,
+      "visible_if": "{{ section.settings.use_mobile_padding }}"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Related products",
+      "category": "t:categories.products",
+      "settings": {
+        "heading": "Related Products",
+        "product": "{{ closest.product }}",
+        "recommendation_type": "related",
+        "max_products": 8,
+        "button_label": "View All Products",
+        "button_label_mobile": "View All",
+        "button_link": "shopify://collections/all",
+        "view_label": "View Product",
+        "add_label": "Add to Cart",
+        "gap": 48,
+        "gap_mobile": 32,
+        "horizontal_padding": 80,
+        "horizontal_padding_mobile": 16,
+        "padding-block-start": 120,
+        "padding-block-end": 120,
+        "use_mobile_padding": true,
+        "padding-block-start-mobile": 48,
+        "padding-block-end-mobile": 48
+      }
+    }
+  ]
+}
+{% endschema %}

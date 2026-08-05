@@ -238,6 +238,30 @@
       background-color: var(--color-background);
     }
   {% endif %}
+
+  {%- comment -%}
+    Figma 2123:236 uses `fi-rs-angle-right`, a tall 24px chevron. The theme's arrow snippet only
+    offers its own arrow/caret glyphs, so the exported vector is swapped in as a background here
+    — this needs `asset_url`, which `{% stylesheet %}` blocks cannot evaluate.
+  {%- endcomment -%}
+  .product-information__media slideshow-arrows .slideshow-control .svg-wrapper {
+    display: none;
+  }
+
+  {%- comment -%}
+    Painted as a mask rather than a background image: a standalone SVG loaded through `url()`
+    has no colour context, so its `fill="currentColor"` resolves to the initial black instead of
+    the button's colour. Masking the shape and filling with `currentColor` puts the glyph back
+    under the `color` property.
+  {%- endcomment -%}
+  .product-information__media slideshow-arrows .slideshow-control::after {
+    content: '';
+    width: 13px;
+    height: 24px;
+    background-color: currentColor;
+    -webkit-mask: url('{{ 'icon-angle-right.svg' | asset_url }}') center / contain no-repeat;
+    mask: url('{{ 'icon-angle-right.svg' | asset_url }}') center / contain no-repeat;
+  }
 {% endstyle %}
 
 {% liquid
@@ -284,6 +308,9 @@
     {% endif %}
     {% if block_settings.extend_media %}
       media-gallery--extend
+    {% endif %}
+    {% if block_settings.sticky_media_desktop %}
+      media-gallery--sticky
     {% endif %}
   "
   style="{% render 'spacing-style', settings: block_settings %} --thumbnail-width: {{ block_settings.thumbnail_width }}px; --media-radius: {{ block_settings.media_radius }}px;{% if block_settings.icons_style contains 'large' %} --slideshow-icon-padding: 0px;{% endif %}--image-gap: {{ block_settings.image_gap }}px;{% unless block_settings.aspect_ratio == 'adapt' %} --gallery-aspect-ratio: {{ block_settings.aspect_ratio }};{% endunless %}"
@@ -343,7 +370,8 @@
           thumbnails: sorted_media,
           controls_on_media: controls_on_media,
           pagination_position: pagination_position,
-          aspect_ratio: block_settings.aspect_ratio
+          aspect_ratio: block_settings.aspect_ratio,
+          overflow_after: block_settings.max_thumbnails
         -%}
       {% endif %}
 
@@ -362,6 +390,21 @@
   {% if render_slideshow_arrows %}
     {% capture slideshow_arrows %}
       {% render 'slideshow-arrows', class: 'mobile:hidden', icon_style: block_settings.icons_style, icon_shape: settings.icons_shape %}
+      {%- comment -%}
+        Figma 2123:1607 puts a dot indicator on the mobile image instead of arrows. It rides in
+        the arrows slot because that is what `slideshow` renders inside <slideshow-container>,
+        the only element that overlays the media — `controls` is a sibling below it. `secondary`
+        keeps the primary slideshowControls ref pointing at the thumbnail strip, while the dot
+        buttons still register as `dots[]` and get their aria-selected from the same setter.
+      {%- endcomment -%}
+      {% if block_settings.show_mobile_scroll_indicator and sorted_media.size > 1 %}
+        {%- render 'slideshow-controls',
+          class: 'desktop:hidden media-gallery__scroll-dots',
+          style: 'dots',
+          item_count: sorted_media.size,
+          secondary: true
+        -%}
+      {% endif %}
     {% endcapture %}
   {% endif %}
 
@@ -569,7 +612,355 @@
   {%- endif -%}
 </media-gallery>
 
+{% if block_settings.show_product_highlights %}
+  <aside class="product-highlights" aria-label="{{ block_settings.highlights_accessibility_label | escape }}">
+    {% for index in (1..5) %}
+      {% liquid
+        assign text_key = 'highlight_' | append: index | append: '_text'
+        assign image_key = 'highlight_' | append: index | append: '_icon'
+        assign highlight_text = block_settings[text_key]
+        assign highlight_image = block_settings[image_key]
+        case index
+          when 1
+            assign fallback_icon = 'map_pin'
+          when 2
+            assign fallback_icon = 'recycle'
+          when 3
+            assign fallback_icon = 'check_box'
+          when 4
+            assign fallback_icon = 'lock'
+          else
+            assign fallback_icon = 'serving_dish'
+        endcase
+      %}
+      {% if highlight_text != blank %}
+        <div class="product-highlights__item">
+          <span class="product-highlights__icon" aria-hidden="true">
+            {%- comment -%}
+              'icon' emits bare <path> elements and must sit inside an <svg>; rendered on its
+              own the parser drops them and the chip comes out empty. 'icon-or-image' supplies
+              that wrapper and handles the uploaded-image case too.
+            {%- endcomment -%}
+            {% render 'icon-or-image',
+              icon: fallback_icon,
+              image_upload: highlight_image,
+              width: 32,
+              class_name: 'product-highlights__glyph'
+            %}
+          </span>
+          <span class="product-highlights__text">{{ highlight_text | escape }}</span>
+        </div>
+      {% endif %}
+    {% endfor %}
+  </aside>
+{% endif %}
+
 {% stylesheet %}
+  /*
+    Pin the gallery beside the details column on desktop — but only where nothing follows it
+    down the media column.
+
+    The block markup has always carried `.sticky-content`, but base.css also ships
+    `.media-gallery--carousel { position: relative }` further down the same file, and at
+    equal specificity the later rule wins — so in the carousel presentation the gallery
+    never actually stuck. Qualifying with the element name clears that rule and the fact
+    that base.css is emitted after this stylesheet.
+
+    The highlights strip is what "nothing follows it" rules out. It sits below the gallery in
+    the same column and is not part of the pinned box, so it keeps scrolling and travels
+    behind it — and base.css sizes the gallery to `max(500px, 100vh - header)`, which leaves
+    no gap under the pinned gallery for it to be read in on the way past. It went from below
+    the fold straight to behind the gallery without ever being on screen. Both only fit the
+    viewport at once if the photo shrinks, so on these products the column scrolls instead
+    and the photo keeps its size.
+
+    Desktop only: below 750px the grid stacks, where a pinned gallery would ride down over
+    the details it is meant to sit beside.
+  */
+  @media screen and (min-width: 750px) {
+    .product-information__media:not(:has(.product-highlights)) media-gallery.media-gallery--sticky {
+      position: sticky;
+      top: var(--sticky-header-offset, 0);
+      z-index: var(--layer-flat);
+
+      /*
+        The gallery's own box is largely transparent (the thumbnail rail is a column of
+        gaps), so anything passing underneath shows through those gaps rather than
+        disappearing under it. --color-background is the token .section-background already
+        paints, so this is a no-op visually until something actually does.
+      */
+      background-color: var(--color-background);
+    }
+
+    /*
+      `.sticky-content` sets `top` as well as `position`, and the carousel rule that clears
+      the one leaves the other standing — so the gallery would sit 110px down its own box
+      and cover the top of the strip. Clear both.
+    */
+    .product-information__media:has(.product-highlights) media-gallery.media-gallery--sticky {
+      position: relative;
+      top: auto;
+    }
+  }
+
+  /* ==========================================================================
+     Sana product image slider — Figma 2123:177 (desktop) / 2123:1597 (mobile).
+     ========================================================================== */
+
+  /* Figma rounds the main image 24px and each thumbnail 8px. `--media-radius` is published by
+     the gallery from its setting but only consumed by the other gallery snippet, so the
+     carousel needs it applied here. */
+  .product-information__media .product-media-container,
+  .product-information__media slideshow-slide {
+    border-radius: var(--media-radius, 0);
+    overflow: hidden;
+  }
+
+  .product-information__media .slideshow-controls__thumbnail {
+    border-radius: var(--thumbnail-radius, 8px);
+  }
+
+  /* Figma 2123:179 fills each tile edge to edge. base.css contains the thumbnail so the button's
+     cream background frames it, which leaves the 8px corners on an area the photo never reaches. */
+  .product-information__media .slideshow-controls__thumbnail img {
+    object-fit: cover;
+  }
+
+  /* --- Arrow buttons on the main image (Figma 2123:235) -------------------- */
+
+  /* The base component fills the media, centres its two controls and blends them against the
+     photo. Figma pins them to the bottom-right inside a 32px inset as solid cream pills. */
+  .product-information__media slideshow-arrows,
+  .product-information__media slideshow-arrows[position='center'] {
+    inset: 0;
+    gap: 12px;
+    align-items: flex-end;
+    justify-content: flex-end;
+    padding: 32px;
+    mix-blend-mode: normal;
+  }
+
+  /* The class is doubled to outrank `.media-gallery--carousel slideshow-arrows
+     .slideshow-control` in base.css, which sets `padding-inline: 0 var(--padding-md)`. That
+     rule ties this one on specificity and base.css is emitted last, so an equal-specificity
+     `padding: 0` loses and the glyph sits off-centre — mirrored on the previous button, which
+     the theme flips with `scale: -1 1`. */
+  .product-information__media slideshow-arrows .slideshow-control.slideshow-control {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 55px;
+    min-width: 55px;
+    height: 55px;
+    min-height: 55px;
+    padding: 0;
+    border: 1px solid #dac6ac;
+    border-radius: 50%;
+    color: #bfac94;
+    background-image: linear-gradient(-32.24deg, #f7f1eb 29.6%, #ffffff 88.87%);
+    opacity: 1;
+    transition: border-color var(--animation-speed) var(--animation-easing);
+  }
+
+  .product-information__media slideshow-arrows .slideshow-control:is(:hover, :focus-visible) {
+    border-color: #064c4d;
+  }
+
+  .product-information__media slideshow-arrows .slideshow-control[disabled] {
+    opacity: 0.4;
+  }
+
+  /* --- "+N more" thumbnail cover (Figma 2123:224) -------------------------- */
+
+  .slideshow-controls__thumbnail--overflow {
+    position: relative;
+  }
+
+  .slideshow-controls__thumbnail--overflow::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: inherit;
+    background: rgb(118 108 94 / 0.56);
+  }
+
+  .slideshow-controls__thumbnail-overflow {
+    position: absolute;
+    z-index: 2;
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
+    color: #fff;
+    font-family: var(--font-body--family);
+    font-size: 24px;
+    font-weight: 500;
+    line-height: 1.3;
+  }
+
+  /* --- Mobile dot indicator (Figma 2123:1607) ----------------------------- */
+
+  /* Five 8px dots, 16px apart: the current one filled Sand/400, the rest outlined. */
+  /* The host defaults to `display: block`, which lets the dot list fill the width and strand it
+     on the left edge; the flex box is what centres the 72px bar on the image. */
+  .media-gallery__scroll-dots {
+    position: absolute;
+    z-index: var(--layer-heightened);
+    right: 0;
+    bottom: 16px;
+    left: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .media-gallery__scroll-dots .slideshow-controls__dots {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .media-gallery__scroll-dots .slideshow-control {
+    width: 8px;
+    min-width: 0;
+    height: 8px;
+    min-height: 0;
+    padding: 0;
+    border: 1px solid #bfac94;
+    border-radius: 50%;
+    background: transparent;
+    opacity: 1;
+    font-size: 0;
+    color: transparent;
+    pointer-events: auto;
+  }
+
+  .media-gallery__scroll-dots .slideshow-control[aria-selected='true'] {
+    background: #bfac94;
+  }
+
+  /* base.css pins the thumbnail button to a hardcoded 6.25rem (and 5.0625rem on mobile),
+     which ignores the --thumbnail-width the gallery already publishes from its setting.
+     Figma 2123:179 wants 87px on both breakpoints. base.css is emitted after this
+     stylesheet, so the selector is scoped to outrank it rather than relying on order. */
+  .product-information__media .slideshow-controls__thumbnail {
+    width: var(--thumbnail-width, 6.25rem);
+  }
+
+  @media screen and (max-width: 749px) {
+    .product-information__media .slideshow-controls__thumbnail {
+      width: var(--thumbnail-width, 5.0625rem);
+      height: auto;
+    }
+  }
+
+  .product-highlights {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    width: 100%;
+    /* Figma 2123:244 sits 48px below the slider (783 - 735). */
+    margin-top: 48px;
+    padding: 16px;
+    border: 1px solid #f3ebe1;
+    border-radius: 24px;
+    background: #fff;
+  }
+
+  .product-highlights__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 72px;
+    padding: 12px 16px;
+    border-radius: 16px;
+    color: #064c4d;
+    background: #f0fdfa;
+  }
+
+  .product-highlights__icon {
+    display: inline-flex;
+    flex: 0 0 48px;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    overflow: hidden;
+    border: 1px solid #b3f7e5;
+    border-radius: 10px;
+    color: #2b8b83;
+    background: linear-gradient(153deg, #b3f7e5 6%, #f0fdfa 75%);
+  }
+
+  .product-highlights__icon :is(img, svg) {
+    display: block;
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+  }
+
+  .product-highlights__text {
+    font-family: var(--font-primary--family);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+
+  @media screen and (max-width: 749px) {
+    .product-highlights {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 24px;
+      /* Figma 2123:1661 sits 24px below the mobile slider (594 - 570). */
+      margin-top: 24px;
+      padding: 12px 16px;
+      border: 0;
+      border-radius: 0;
+      background: #f0fdfa;
+      overflow-x: auto;
+      overscroll-behavior-inline: contain;
+      scroll-snap-type: inline proximity;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .product-highlights::-webkit-scrollbar { display: none; }
+
+    .product-highlights__item {
+      align-items: center;
+      flex: 0 0 auto;
+      min-height: 40px;
+      padding: 0;
+      gap: 12px;
+      background: transparent;
+      scroll-snap-align: start;
+    }
+
+    .product-highlights__icon {
+      flex-basis: 40px;
+      width: 40px;
+      height: 40px;
+    }
+
+    .product-highlights__icon :is(img, svg) {
+      width: 24px;
+      height: 24px;
+    }
+
+    .product-highlights__text {
+      font-size: 14px;
+      line-height: 1.5;
+      white-space: nowrap;
+    }
+  }
+
   .dialog-zoomed-gallery {
     cursor: zoom-out;
   }
@@ -703,6 +1094,88 @@
   "name": "t:names.product_media",
   "tag": null,
   "settings": [
+    {
+      "type": "header",
+      "content": "Product highlights"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_product_highlights",
+      "label": "Show product highlights",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "highlights_accessibility_label",
+      "label": "Accessibility label",
+      "default": "Product highlights",
+      "visible_if": "{{ block.settings.show_product_highlights }}"
+    },
+    {
+      "type": "text",
+      "id": "highlight_1_text",
+      "label": "Highlight 1",
+      "default": "Made in the USA",
+      "visible_if": "{{ block.settings.show_product_highlights }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "highlight_1_icon",
+      "label": "Highlight 1 icon",
+      "visible_if": "{{ block.settings.show_product_highlights }}"
+    },
+    {
+      "type": "text",
+      "id": "highlight_2_text",
+      "label": "Highlight 2",
+      "default": "#5 Recyclable",
+      "visible_if": "{{ block.settings.show_product_highlights }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "highlight_2_icon",
+      "label": "Highlight 2 icon",
+      "visible_if": "{{ block.settings.show_product_highlights }}"
+    },
+    {
+      "type": "text",
+      "id": "highlight_3_text",
+      "label": "Highlight 3",
+      "default": "FDA-Compliant",
+      "visible_if": "{{ block.settings.show_product_highlights }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "highlight_3_icon",
+      "label": "Highlight 3 icon",
+      "visible_if": "{{ block.settings.show_product_highlights }}"
+    },
+    {
+      "type": "text",
+      "id": "highlight_4_text",
+      "label": "Highlight 4",
+      "default": "Child-Resistant Certified",
+      "visible_if": "{{ block.settings.show_product_highlights }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "highlight_4_icon",
+      "label": "Highlight 4 icon",
+      "visible_if": "{{ block.settings.show_product_highlights }}"
+    },
+    {
+      "type": "text",
+      "id": "highlight_5_text",
+      "label": "Highlight 5",
+      "default": "Food-Grade Certified",
+      "visible_if": "{{ block.settings.show_product_highlights }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "highlight_5_icon",
+      "label": "Highlight 5 icon",
+      "visible_if": "{{ block.settings.show_product_highlights }}"
+    },
     {
       "type": "select",
       "id": "media_presentation",
@@ -863,11 +1336,29 @@
       "id": "thumbnail_width",
       "label": "t:settings.width",
       "min": 44,
-      "max": 72,
+      "max": 96,
       "step": 1,
       "unit": "px",
       "default": 64,
       "visible_if": "{{ block.settings.media_presentation == 'carousel' and block.settings.slideshow_controls_style == 'thumbnails' or block.settings.media_presentation == 'carousel' and block.settings.slideshow_mobile_controls_style == 'thumbnails' }}"
+    },
+    {
+      "type": "range",
+      "id": "max_thumbnails",
+      "label": "Maximum thumbnails",
+      "info": "The last tile becomes a '+N' cover when the product has more media than this. 0 shows every thumbnail.",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "default": 0,
+      "visible_if": "{{ block.settings.media_presentation == 'carousel' and block.settings.slideshow_controls_style == 'thumbnails' or block.settings.media_presentation == 'carousel' and block.settings.slideshow_mobile_controls_style == 'thumbnails' }}"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_mobile_scroll_indicator",
+      "label": "Show dot indicator on the image (mobile)",
+      "default": false,
+      "visible_if": "{{ block.settings.media_presentation == 'carousel' }}"
     },
     {
       "type": "header",
@@ -902,6 +1393,13 @@
       "id": "constrain_to_viewport",
       "label": "t:settings.limit_media_to_screen_height",
       "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "sticky_media_desktop",
+      "label": "t:settings.make_details_sticky_desktop",
+      "info": "Pins the gallery beside the product details while the details column scrolls.",
+      "default": true
     },
     {
       "type": "select",

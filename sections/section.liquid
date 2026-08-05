@@ -1,13 +1,417 @@
-{% capture children %}
-  {% content_for 'blocks' %}
-{% endcapture %}
+{% liquid
+  assign show_section = true
+  if section.settings.product_faq_style and product.metafields.custom.faq.value == blank
+    assign show_section = false
+  endif
 
-{% render 'section',
-  section: section,
-  children: children,
-  section_id: section.id,
-  background_color: section.settings.background_color
+  # The Klaviyo widget is injected client-side, so on an unreviewed product it mounts
+  # nothing and leaves this section's background and 120px padding standing as an empty
+  # band. The app syncs its totals to the standard `reviews` metafields — the only view of
+  # review data Liquid gets, and one that tracks the widget exactly — so nothing there
+  # means nothing to show. The editor keeps the section, which could not be selected
+  # on such a product otherwise.
+  if section.settings.klaviyo_reviews_style
+    assign review_count = product.metafields.reviews.rating_count.value | plus: 0
+    unless review_count > 0 or request.design_mode or request.visual_preview_mode
+      assign show_section = false
+    endunless
+  endif
 %}
+
+{% if section.settings.product_faq_style %}
+  {% capture children %}
+    <div class="product-faq__main">
+      <header class="product-faq__header">
+        <h2 class="product-faq__title">{{ section.settings.faq_heading | escape }}</h2>
+        {% if section.settings.faq_page_link != blank %}
+          <p class="product-faq__subtitle">
+            Find out more on our <a href="{{ section.settings.faq_page_link }}"><span>FAQs</span></a> page
+          </p>
+        {% endif %}
+      </header>
+      <div class="product-faq__accordion">
+        {% capture faq_richtext %}{{ product.metafields.custom.faq | metafield_tag }}{% endcapture %}
+        {% liquid
+          assign faq_normalized = faq_richtext | replace: '<div class="metafield-rich_text_field">', '' | replace: '</div>', ''
+          assign faq_normalized = faq_normalized | replace: '<h1', '<h2'
+          assign faq_normalized = faq_normalized | replace: '</h1>', '</h2>'
+          assign faq_normalized = faq_normalized | replace: '<h3', '<h2'
+          assign faq_normalized = faq_normalized | replace: '</h3>', '</h2>'
+          assign faq_normalized = faq_normalized | replace: '<h4', '<h2'
+          assign faq_normalized = faq_normalized | replace: '</h4>', '</h2>'
+          assign faq_normalized = faq_normalized | replace: '<h5', '<h2'
+          assign faq_normalized = faq_normalized | replace: '</h5>', '</h2>'
+          assign faq_normalized = faq_normalized | replace: '<h6', '<h2'
+          assign faq_normalized = faq_normalized | replace: '</h6>', '</h2>'
+          assign faq_entries = faq_normalized | split: '<h2'
+        %}
+        {% for faq_entry in faq_entries offset: 1 %}
+          {% assign faq_parts = faq_entry | split: '</h2>' %}
+          {% assign faq_heading_markup = faq_parts.first %}
+          {% assign faq_question = faq_heading_markup | prepend: '<h2' | append: '</h2>' | strip_html | strip %}
+          {% assign faq_answer = faq_entry | remove_first: faq_heading_markup | remove_first: '</h2>' | strip %}
+          {% if faq_question != blank %}
+            <details class="product-faq__item"{% if forloop.index == 2 %} open{% endif %}>
+              <summary>
+                <span>{{ faq_question }}</span>
+                <span class="product-faq__toggle" aria-hidden="true"></span>
+              </summary>
+              {% if faq_answer != blank %}<div class="product-faq__answer rte">{{ faq_answer }}</div>{% endif %}
+            </details>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    <aside class="product-faq__aside">
+      <div class="product-faq__help">
+        <div class="product-faq__help-copy">
+          <h3>{{ section.settings.faq_contact_heading | escape }}</h3>
+          <div class="rte">{{ section.settings.faq_contact_text }}</div>
+        </div>
+        {% if section.settings.faq_contact_link != blank %}
+          <a class="product-faq__button" href="{{ section.settings.faq_contact_link }}">
+            {{ section.settings.faq_contact_label | escape }}
+            {%- comment -%} Figma "Icon/Arrow Top Right" (I2123:736;258:1151). {%- endcomment -%}
+            <svg class="product-faq__button-icon" width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true" focusable="false">
+              <path d="M11 11V1H1M11 1L1 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </a>
+        {% endif %}
+      </div>
+      <div class="product-faq__catalog">
+        <div class="rte">{{ section.settings.faq_catalog_text }}</div>
+        {% if section.settings.faq_catalog_link != blank %}
+          <a class="product-faq__catalog-link" href="{{ section.settings.faq_catalog_link }}">
+            <span>{{ section.settings.faq_catalog_label | escape }}</span>
+            {%- comment -%} Figma "fi-rs-sign-in" (2123:741), rotated a quarter turn into a download arrow. {%- endcomment -%}
+            <svg class="product-faq__catalog-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+              <path d="M1.33333 14V2C1.33333 1.82319 1.40357 1.65362 1.5286 1.5286C1.65362 1.40357 1.82319 1.33333 2 1.33333H5.33333V0H2C1.46957 0 0.960859 0.210714 0.585786 0.585786C0.210714 0.960859 0 1.46957 0 2L0 14C0 14.5304 0.210714 15.0391 0.585786 15.4142C0.960859 15.7893 1.46957 16 2 16H5.33333V14.6667H2C1.82319 14.6667 1.65362 14.5964 1.5286 14.4714C1.40357 14.3464 1.33333 14.1768 1.33333 14V14Z"/>
+              <path d="M16 8.66626V7.33293L5.03731 7.3536L7.91931 4.47093L6.97531 3.52826L3.91798 6.5856C3.54303 6.96065 3.3324 7.46927 3.3324 7.9996C3.3324 8.52993 3.54303 9.03854 3.91798 9.4136L6.97531 12.4709L7.91798 11.5283L5.07598 8.68626L16 8.66626Z"/>
+            </svg>
+          </a>
+        {% endif %}
+      </div>
+    </aside>
+  {% endcapture %}
+{% else %}
+  {% capture children %}
+    {% content_for 'blocks' %}
+  {% endcapture %}
+{% endif %}
+
+{% comment %}
+  The Klaviyo reviews design needs no markup of its own — the app block's widget
+  already renders the heading, the rule and the summary. Only the stylesheet.
+{% endcomment %}
+{% if section.settings.klaviyo_reviews_style %}
+  {% render 'klaviyo-reviews-styles' %}
+{% endif %}
+
+{% if show_section %}
+  {% render 'section',
+    section: section,
+    children: children,
+    section_id: section.id,
+    background_color: section.settings.background_color
+  %}
+{% endif %}
+
+{% stylesheet %}
+  /* Figma "Section/FAQs" 2123:696 (desktop) and 2123:2120 (mobile). The 1280px card
+     sits inside 80px page gutters with 120px of breathing room above and below. */
+  .section--product-faq {
+    --full-page-grid-central-column-width: min(1280px, calc(100% - 160px));
+    margin-block: 120px;
+    color: #fff;
+  }
+
+  /*
+   * The artwork and the content share one grid cell. Without this the background
+   * lands in an auto-placed row of its own — and because its only child is an
+   * absolutely positioned <img>, that row collapses to zero height and the ocean
+   * photo never shows. Pinning both to row 1 / column 2 lets the background stretch
+   * to the card's height and stay inside the page-width column.
+   */
+  .section--product-faq > .custom-section-background,
+  .section--product-faq > .custom-section-content {
+    grid-area: 1 / 2 / 2 / 3;
+    border-radius: 30px;
+  }
+
+  .section--product-faq > .custom-section-background {
+    position: relative;
+    overflow: hidden;
+    background: #064c4d;
+  }
+
+  /* Figma paints the photo under a -52.53deg wash: solid teal at the bottom-right,
+     thinning to 20% by the top-left so the waves read through. */
+  .section--product-faq > .custom-section-background::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(-52.53deg, #064c4d 7%, rgb(6 76 77 / .2) 95%);
+  }
+
+  /* base.css darkens every mobile background image with a black scrim; the design
+     keeps the card in its own teal, so opt this one out. */
+  .section--product-faq .background-image-container::before {
+    display: none;
+  }
+
+  .section--product-faq > .custom-section-content {
+    overflow: hidden;
+  }
+
+  .section--product-faq > .custom-section-content > .section-content-wrapper {
+    display: grid;
+    grid-template-columns: minmax(0, 872fr) minmax(0, 408fr);
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .product-faq__main {
+    padding: 56px;
+    border-radius: 24px;
+    background: rgb(6 76 77 / .85);
+  }
+
+  .product-faq__header { display: flex; flex-direction: column; gap: 8px; margin-bottom: 32px; }
+  .product-faq__title { margin: 0; color: #fff; font-size: 48px; font-weight: 700; line-height: 1.1; }
+  .product-faq__subtitle { margin: 0; color: #b3f7e5; font-size: 16px; font-weight: 500; line-height: 1.5; }
+  .product-faq__subtitle a { color: inherit; text-decoration: none; }
+  .product-faq__subtitle a span { text-decoration: underline; text-underline-offset: 2px; }
+
+  /* A rule above the first row and below every row, with 28px of air on each side
+     of the question — the accordion's 28px stack gap in Figma. */
+  .product-faq__accordion { border-top: 1px solid #2b8b83; }
+  .product-faq__item { padding-block: 28px; border-bottom: 1px solid #2b8b83; }
+  .product-faq__item summary { display: flex; align-items: center; gap: 16px; padding-inline-end: 8px; color: #fff; cursor: pointer; list-style: none; font-size: 20px; font-weight: 600; line-height: 1.3; }
+  .product-faq__item summary::-webkit-details-marker { display: none; }
+  .product-faq__item summary > span:first-child { flex: 1; }
+  .product-faq__toggle { position: relative; flex: 0 0 12px; width: 12px; height: 12px; }
+  .product-faq__toggle::before,
+  .product-faq__toggle::after { content: ''; position: absolute; top: calc(50% - 1px); left: 0; width: 12px; height: 2px; border-radius: 1px; background: #5bc5ad; transition: transform .2s ease; }
+  .product-faq__toggle::after { transform: rotate(90deg); }
+  /* Open: the upright bar swings flat onto the horizontal one, leaving a minus. */
+  .product-faq__item[open] .product-faq__toggle::after { transform: rotate(0); }
+  .product-faq__answer { margin-top: 10px; color: #fff; font-size: 16px; font-weight: 400; line-height: 1.5; }
+  .product-faq__answer > :first-child { margin-top: 0; }
+  .product-faq__answer > :last-child { margin-bottom: 0; }
+
+  .product-faq__aside { display: flex; flex-direction: column; justify-content: space-between; gap: 48px; padding: 56px; color: #fff; }
+  .product-faq__help { display: flex; flex-direction: column; align-items: flex-start; gap: 32px; }
+  .product-faq__help-copy { display: flex; flex-direction: column; gap: 16px; }
+  .product-faq__help h3 { margin: 0; color: #fff; font-size: 36px; font-weight: 600; line-height: 1.2; }
+  .product-faq__aside .rte { font-size: 16px; line-height: 1.5; }
+  .product-faq__aside .rte > :first-child { margin-top: 0; }
+  .product-faq__aside .rte > :last-child { margin-bottom: 0; }
+
+  .product-faq__button { display: inline-flex; align-items: center; gap: 10px; padding: 14px 28px; border: 1px solid #fff; border-radius: 80px; color: #fff; background: rgb(255 255 255 / .16); text-decoration: none; font-size: 16px; font-weight: 600; letter-spacing: .02em; transition: background-color .2s ease; }
+  .product-faq__button:hover { background: rgb(255 255 255 / .28); }
+  .product-faq__button-icon { flex: 0 0 12px; }
+
+  .product-faq__catalog { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
+  .product-faq__catalog-link { display: inline-flex; align-items: center; gap: 10px; padding-block: 6px; color: #b3f7e5; text-decoration: none; font-size: 14px; font-weight: 600; letter-spacing: .02em; }
+  .product-faq__catalog-link span { text-decoration: underline; text-underline-offset: 3px; }
+  .product-faq__catalog-icon { flex: 0 0 16px; transform: rotate(-90deg); }
+
+  /* Between the mobile stack and the full 1280px card the aside still has to hold a
+     36px heading, so ease the panel padding in rather than letting the copy pinch. */
+  @media screen and (min-width: 750px) and (max-width: 1099px) {
+    .section--product-faq { --full-page-grid-central-column-width: calc(100% - 64px); margin-block: 80px; }
+    .product-faq__main,
+    .product-faq__aside { padding: 40px; }
+    .product-faq__title { font-size: 40px; }
+    .product-faq__help h3 { font-size: 28px; }
+    .product-faq__help { gap: 24px; }
+  }
+
+  @media screen and (max-width: 749px) {
+    .section--product-faq { --full-page-grid-central-column-width: calc(100% - 32px); margin-block: 48px; }
+    .section--product-faq > .custom-section-content > .section-content-wrapper { grid-template-columns: 1fr; }
+    .product-faq__main { padding: 32px 24px; }
+    .product-faq__aside { padding: 32px 24px; }
+    .product-faq__help { gap: 24px; }
+    .product-faq__help-copy { gap: 8px; }
+    .product-faq__help h3 { font-size: 24px; line-height: 1.1; }
+    /* Mobile promotes the catalog line to the small semibold body style. */
+    .product-faq__catalog .rte { font-size: 14px; font-weight: 600; }
+  }
+
+  /* Two panels sitting flush inside one rounded, clipped container. Existing group
+     settings cover colour, padding and content; these rules only add what they can't:
+     equal-height stretch, the diagonal accent gradient, and the decorative image bleed. */
+  .section--customization-panels > .custom-section-content > .section-content-wrapper {
+    align-items: stretch;
+    overflow: hidden;
+    border-radius: 32px;
+  }
+
+  .section--customization-panels > .custom-section-content > .section-content-wrapper > .group-block {
+    min-height: 448px;
+  }
+
+  /* The leading panel butts against the accent panel, so its trailing corners stay square
+     and the wrapper's own radius supplies the outer curve. */
+  .section--customization-panels > .custom-section-content > .section-content-wrapper > .group-block:first-child {
+    border-start-end-radius: 0;
+    border-end-end-radius: 0;
+  }
+
+  .section--customization-panels > .custom-section-content > .section-content-wrapper > .group-block:last-child {
+    z-index: var(--layer-flat);
+    border-radius: 32px;
+    background-image: linear-gradient(129deg, #5bc5ad 31%, #e6d7c3 84%);
+  }
+
+  /* The decorative image slides under the accent panel instead of squeezing the copy. */
+  .section--customization-panels .image-block {
+    align-self: center;
+    margin-inline-end: -140px;
+    pointer-events: none;
+  }
+
+  /*
+   * Figma names this layer "Hover Image" (2123:571): the template stack is parked out of
+   * sight and slides into the seam between the two panels when the section is hovered.
+   *
+   * No extra mask is needed for the resting state. The accent panel is opaque and paints
+   * above the leading panel (z-index below), and the negative margin above already tucks
+   * the image's trailing edge under it — so translating the image by its own width puts
+   * all of it behind the panel, and the wrapper's overflow clip catches anything past the
+   * far edge.
+   *
+   * Hover-capable pointers only, matching the featured card in custom-packaging-grid: a tap
+   * on touch leaves :hover stuck on, and on a phone the panels stack so there is no seam to
+   * slide out of. Excluding reduced-motion here also means that preference simply leaves the
+   * image where the design puts it, visible and still, rather than hiding it outright.
+   */
+  @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+    .section--customization-panels .image-block {
+      opacity: 0;
+      transform: translateX(100%);
+      transition: opacity 0.25s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /*
+     * Hover is scoped to the rounded two-panel card rather than the .section box, which
+     * spans the full page width plus 100px of block padding — triggering from there would
+     * fire the reveal with the cursor nowhere near the artwork.
+     *
+     * :focus-within is the keyboard equivalent: tabbing to any control in either panel
+     * counts as being in the section.
+     */
+    .section--customization-panels
+      > .custom-section-content
+      > .section-content-wrapper:is(:hover, :focus-within)
+      .image-block {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @media screen and (max-width: 989px) {
+    .section--customization-panels > .custom-section-content > .section-content-wrapper > .group-block {
+      min-height: 420px;
+    }
+  }
+
+  @media screen and (max-width: 749px) {
+    .section--customization-panels > .custom-section-content > .section-content-wrapper,
+    .section--customization-panels > .custom-section-content > .section-content-wrapper > .group-block:last-child {
+      border-radius: 24px;
+    }
+
+    .section--customization-panels > .custom-section-content > .section-content-wrapper > .group-block {
+      min-height: 0;
+    }
+
+    /* Stacked on mobile, so the leading panel gets its corners back. */
+    .section--customization-panels > .custom-section-content > .section-content-wrapper > .group-block:first-child {
+      border-start-end-radius: 24px;
+      border-end-end-radius: 24px;
+    }
+
+    .section--customization-panels .image-block {
+      margin-inline-end: 0;
+    }
+  }
+
+  .section--subfooter-icons {
+    background: linear-gradient(123deg, #f7f1eb 24%, #e6d7c3 91%);
+  }
+
+  .section--subfooter-icons .custom-section-background {
+    opacity: .3;
+    mix-blend-mode: multiply;
+  }
+
+  .section--subfooter-icons > .custom-section-content > .section-content-wrapper {
+    justify-content: space-between;
+  }
+
+  .section--subfooter-icons > .custom-section-content > .section-content-wrapper > .group-block {
+    width: min(23.4%, 307px);
+    min-height: 80px;
+    padding: 16px;
+    border-radius: 20px;
+    background: rgb(247 241 235 / .83);
+  }
+
+  .section--subfooter-icons > .custom-section-content > .section-content-wrapper > .group-block > .group-block-content {
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .section--subfooter-icons .icon-block {
+    display: grid;
+    flex: 0 0 48px;
+    width: 48px;
+    height: 48px;
+    place-items: center;
+    border: 1px solid #e6d7c3;
+    border-radius: 10px;
+    color: #9e8568;
+    background: linear-gradient(153deg, #e6d7c3 6%, #f7f1eb 75%);
+  }
+
+  .section--subfooter-icons .icon-block__media {
+    width: 30px;
+    height: 30px;
+  }
+
+  .section--subfooter-icons .text-block,
+  .section--subfooter-icons .text-block :is(p, h2, h3) {
+    margin: 0;
+    color: #064c4d;
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.3;
+    text-align: left;
+  }
+
+  @media screen and (max-width: 749px) {
+    .section--subfooter-icons > .custom-section-content > .section-content-wrapper {
+      gap: 12px;
+    }
+
+    .section--subfooter-icons > .custom-section-content > .section-content-wrapper > .group-block {
+      width: 100%;
+      min-height: 80px;
+    }
+
+    .section--subfooter-icons > .custom-section-content > .section-content-wrapper > .group-block > .group-block-content {
+      flex-direction: row;
+    }
+
+    .section--subfooter-icons .text-block,
+    .section--subfooter-icons .text-block :is(p, h2, h3) {
+      font-size: 18px;
+    }
+  }
+{% endstylesheet %}
 
 {% schema %}
 {
@@ -61,6 +465,92 @@
       "label": "Clip overflowing content",
       "info": "Crops anything that spills outside the section, so blocks with negative margins bleed off the edge instead of overlapping neighbouring sections.",
       "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "subfooter_icons_style",
+      "label": "Use subfooter icons design",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "customization_panels_style",
+      "label": "Use side-by-side panels design",
+      "info": "Stretches the section's top-level groups to equal height inside one rounded, clipped container. The last group receives the accent gradient.",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "product_faq_style",
+      "label": "Use product metafield FAQ design",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "klaviyo_reviews_style",
+      "label": "Use Klaviyo reviews design",
+      "info": "Restyles the Klaviyo product reviews app block to the customer reviews design. Add that app block to this section.",
+      "default": false
+    },
+    {
+      "type": "text",
+      "id": "faq_heading",
+      "label": "FAQ heading",
+      "default": "FAQs",
+      "visible_if": "{{ section.settings.product_faq_style }}"
+    },
+    {
+      "type": "url",
+      "id": "faq_page_link",
+      "label": "FAQ page link",
+      "visible_if": "{{ section.settings.product_faq_style }}"
+    },
+    {
+      "type": "text",
+      "id": "faq_contact_heading",
+      "label": "Contact heading",
+      "default": "Didn't find your answer?",
+      "visible_if": "{{ section.settings.product_faq_style }}"
+    },
+    {
+      "type": "richtext",
+      "id": "faq_contact_text",
+      "label": "Contact text",
+      "default": "<p>Don't hesitate to reach out. We're here to help you find the right products for your brand.</p>",
+      "visible_if": "{{ section.settings.product_faq_style }}"
+    },
+    {
+      "type": "text",
+      "id": "faq_contact_label",
+      "label": "Contact button label",
+      "default": "Contact Us",
+      "visible_if": "{{ section.settings.product_faq_style }}"
+    },
+    {
+      "type": "url",
+      "id": "faq_contact_link",
+      "label": "Contact button link",
+      "visible_if": "{{ section.settings.product_faq_style }}"
+    },
+    {
+      "type": "richtext",
+      "id": "faq_catalog_text",
+      "label": "Catalog text",
+      "default": "<p>Want to see more? Explore our full product catalog for the complete lineup.</p>",
+      "visible_if": "{{ section.settings.product_faq_style }}"
+    },
+    {
+      "type": "text",
+      "id": "faq_catalog_label",
+      "label": "Catalog link label",
+      "default": "View Full Product Catalog",
+      "visible_if": "{{ section.settings.product_faq_style }}"
+    },
+    {
+      "type": "url",
+      "id": "faq_catalog_link",
+      "label": "Catalog link",
+      "visible_if": "{{ section.settings.product_faq_style }}"
     },
     {
       "type": "select",

@@ -11,7 +11,12 @@
   {% endstyle %}
 {%- endif -%}
 
-{% render 'quantity-selector', product: closest.product, block: block, wrapper_class: wrapper_class %}
+{% render 'quantity-selector',
+  product: closest.product,
+  block: block,
+  wrapper_class: wrapper_class,
+  stepper_style: block.settings.stepper_style
+%}
 
 {% schema %}
 {
@@ -21,6 +26,22 @@
     {
       "type": "header",
       "content": "t:content.input"
+    },
+    {
+      "type": "select",
+      "id": "stepper_style",
+      "label": "Stepper style",
+      "options": [
+        {
+          "value": "default",
+          "label": "Minus and plus"
+        },
+        {
+          "value": "chevron",
+          "label": "Stacked chevrons"
+        }
+      ],
+      "default": "default"
     },
     {
       "type": "select",

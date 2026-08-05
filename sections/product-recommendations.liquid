@@ -30,7 +30,7 @@
 {% render 'product-badges-styles' %}
 <product-recommendations
   id="product-recommendations-{{ section.id }}"
-  class="product-recommendations"
+  class="product-recommendations product-recommendations--sana"
   data-url="{{ routes.product_recommendations_url }}?limit={{ section.settings.max_products }}"
   data-section-id="{{ section.id }}"
   data-product-id="{{ section.settings.product.id | default: product.id }}"
@@ -47,7 +47,8 @@
   %}
 
   <div
-    class="section-background{% if section.settings.background_color != blank %} color-custom-{{ section.id }}{% endif %}"
+    class="section-background product-recommendations__background{% if section.settings.background_color != blank %} color-custom-{{ section.id }}{% endif %}"
+    style="{% if section.settings.background_image != blank %}--recommendations-texture: url('{{ section.settings.background_image | image_url: width: 2400 }}');{% endif %}"
   ></div>
   <div
     class="
@@ -184,6 +185,281 @@
     {%- endif -%}
   </div>
 </product-recommendations>
+
+{% stylesheet %}
+  .product-recommendations--sana {
+    --recommendations-card: #064c4d;
+    --recommendations-accent: #7ce5cc;
+    --recommendations-deep: #023031;
+    color: #fff;
+  }
+
+  .product-recommendations--sana .product-recommendations__background {
+    background-color: #064c4d;
+    background-image: var(--recommendations-texture), linear-gradient(186deg, #42a899 2%, #146b68 30%, #064c4d 57%, #023031 97%);
+    background-position: center;
+    background-size: cover;
+    background-blend-mode: multiply, normal;
+  }
+
+  .product-recommendations--sana .section-resource-list {
+    padding-block: clamp(72px, 8.333vw, 120px);
+    row-gap: 48px;
+  }
+
+  .product-recommendations--sana .section-resource-list__content {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+  }
+
+  .product-recommendations--sana .section-resource-list__content h2 {
+    margin: 0;
+    color: #fff;
+    font-family: var(--font-primary--family);
+    font-size: clamp(28px, 2.5vw, 36px);
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .product-recommendations--sana .section-resource-list__content .button {
+    min-height: 48px;
+    padding: 12px 28px;
+    border: 1px solid #fff;
+    border-radius: 80px;
+    color: #fff;
+    background: transparent;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: .02em;
+  }
+
+  .product-recommendations--sana .resource-list__carousel {
+    --slide-width-max: none !important;
+  }
+
+  .product-recommendations--sana .resource-list__carousel slideshow-slides {
+    gap: 32px;
+  }
+
+  .product-recommendations--sana .resource-list__slide {
+    --slide-width: calc((100% - 96px) / 4);
+  }
+
+  .product-recommendations--sana .product-card {
+    overflow: hidden;
+    border-radius: 24px;
+    color: #fff;
+    background: var(--recommendations-card);
+  }
+
+  .product-recommendations--sana .product-card__content {
+    position: relative;
+    gap: 0;
+    padding: 0 0 24px;
+    background: var(--recommendations-card);
+  }
+
+  .product-recommendations--sana .product-card__content > .card-gallery {
+    overflow: hidden;
+    aspect-ratio: 400 / 500;
+    border-radius: 24px 24px 0 0;
+  }
+
+  .product-recommendations--sana .card-gallery::after {
+    content: '';
+    position: absolute;
+    inset: 28% 0 0;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(to bottom, transparent, rgb(20 107 104 / .9));
+  }
+
+  .product-recommendations--sana .card-gallery img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* The title block is wrapped in <a class="contents">, so it is a GRANDCHILD of
+     .product-card__content. The previous direct-child selector never matched, which left
+     the title inheriting the section's dark foreground — dark text on the dark scrim. */
+  /* The wrapper <a class="contents"> is display:contents and generates no box, so the
+     .text-block itself has to carry the positioning. */
+  .product-recommendations--sana .product-card__content > a.contents > .text-block {
+    position: absolute;
+    z-index: 3;
+    left: 24px;
+    right: 24px;
+    bottom: 127px;
+    width: auto;
+    margin: 0;
+    pointer-events: none;
+  }
+
+  .product-recommendations--sana .product-card__content > a.contents > .text-block,
+  .product-recommendations--sana .product-card__content > a.contents > .text-block :is(h2, h3, h4, p) {
+    color: #fff;
+    font-family: var(--font-heading--family);
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  /* Figma shows "View Product" permanently beneath the title; the theme default reveals it
+     on hover only (opacity: 0). */
+  /* Anchored to the gallery box, whose lower edge is where the buy bar begins — so this
+     lands directly under the title rather than above it. */
+  .product-recommendations--sana .card-media-actions {
+    position: absolute;
+    z-index: 4;
+    inset: auto 24px 12px;
+    display: block;
+    justify-content: flex-start;
+  }
+
+  .product-recommendations--sana .card-media-actions .card-media-actions__view {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    opacity: 1;
+    color: #fff;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0;
+    transform: none;
+  }
+
+  .product-recommendations--sana .product-card__content > .buy-buttons-block {
+    display: block;
+    width: 100%;
+    margin-top: 24px;
+    padding-inline: 16px;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+
+  .product-recommendations--sana .buy-buttons-block product-form-component,
+  .product-recommendations--sana .buy-buttons-block .shopify-product-form {
+    display: block;
+    width: 100%;
+  }
+
+  .product-recommendations--sana .buy-buttons-block .product-form-buttons {
+    display: grid;
+    grid-template-columns: minmax(96px, .8fr) minmax(140px, 1.2fr);
+    gap: 16px;
+    width: 100%;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+
+  .product-recommendations--sana .buy-buttons-block .quantity-selector {
+    min-height: 40px;
+    height: 40px;
+    border-color: var(--recommendations-accent);
+    border-radius: 24px;
+    color: #fff;
+    background: transparent;
+  }
+
+  .product-recommendations--sana .buy-buttons-block add-to-cart-component,
+  .product-recommendations--sana .buy-buttons-block .add-to-cart-button {
+    display: flex;
+    width: 100%;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+
+  .product-recommendations--sana .buy-buttons-block .add-to-cart-button {
+    min-height: 40px;
+    height: 40px;
+    border-color: var(--recommendations-accent);
+    border-radius: 80px;
+    color: var(--recommendations-deep);
+    background: var(--recommendations-accent);
+    font-size: 14px;
+  }
+
+  .product-recommendations--sana .card-media-actions {
+    inset-inline: 24px;
+    bottom: 24px;
+    z-index: 3;
+    justify-content: flex-start;
+  }
+
+  .product-recommendations--sana .card-media-actions__view {
+    padding: 0;
+    border: 0;
+    color: #fff;
+    background: transparent;
+    font-size: 14px;
+  }
+
+  .product-recommendations--sana .resource-list__carousel slideshow-component {
+    padding-bottom: 87px;
+  }
+
+  .product-recommendations--sana .resource-list__carousel slideshow-container {
+    overflow: visible;
+  }
+
+  .product-recommendations--sana .resource-list__carousel slideshow-arrows {
+    position: absolute;
+    inset: calc(100% + 32px) auto auto 0;
+    display: flex;
+    width: 122px;
+    height: 55px;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 0;
+    z-index: var(--layer-raised);
+    pointer-events: none;
+    mix-blend-mode: normal;
+  }
+
+  .product-recommendations--sana slideshow-arrows .slideshow-control {
+    position: static;
+    width: 55px;
+    height: 55px;
+    border: 0;
+    border-radius: 50%;
+    color: #fff;
+    background: rgb(43 139 131 / .5);
+    opacity: 1;
+  }
+
+  .product-recommendations--sana slideshow-arrows .slideshow-control[disabled] {
+    display: flex;
+    opacity: .45;
+  }
+
+  @media screen and (max-width: 989px) {
+    .product-recommendations--sana .resource-list__slide { --slide-width: calc((100% - 32px) / 2.25); }
+  }
+
+  @media screen and (max-width: 749px) {
+    .product-recommendations--sana .section-resource-list { padding-block: 64px; row-gap: 32px; }
+    .product-recommendations--sana .section-resource-list__content { align-items: flex-start; flex-direction: column; }
+    .product-recommendations--sana .resource-list__carousel slideshow-slides { gap: 16px; }
+    .product-recommendations--sana .resource-list__slide { --slide-width: min(82vw, 344px); }
+    .product-recommendations--sana .product-card__content > .text-block { bottom: 100px; }
+    .product-recommendations--sana .product-card__content > .text-block :is(h2, h3, h4, p, a) { font-size: 20px; }
+    .product-recommendations--sana .buy-buttons-block .product-form-buttons { grid-template-columns: minmax(88px, .8fr) minmax(132px, 1.2fr); gap: 12px; }
+    .product-recommendations--sana .resource-list__carousel slideshow-component { padding-bottom: 72px; }
+    .product-recommendations--sana .resource-list__carousel slideshow-arrows { inset-block-start: calc(100% + 24px); width: 108px; height: 48px; }
+    .product-recommendations--sana slideshow-arrows .slideshow-control { width: 48px; height: 48px; }
+  }
+{% endstylesheet %}
 
 {% schema %}
 {
@@ -417,6 +693,16 @@
       "step": 1,
       "unit": "px",
       "default": 12
+    },
+    {
+      "type": "header",
+      "content": "Background"
+    },
+    {
+      "type": "image_picker",
+      "id": "background_image",
+      "label": "Background image",
+      "info": "Displayed over the teal gradient to match the design."
     },
     {
       "type": "color",

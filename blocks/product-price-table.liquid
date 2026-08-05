@@ -1,0 +1,213 @@
+{%- doc -%}
+  Tiered price table for the PDP "Price" accordion row — Figma 2123:360.
+
+  Four centred columns: unit quantity, unit price, case quantity, case price.
+
+  Rows come from, in order of precedence:
+    1. `custom.product_price_table` — JSON list of
+       {unit_quantity, unit_price, case_quantity, case_price} objects. Values are
+       printed verbatim, so the merchant controls formatting.
+    2. Shopify volume pricing on the selected variant (`quantity_price_breaks`),
+       expanded to units with `custom.units_per_case`.
+    3. Placeholder rows, in the theme editor only.
+{%- enddoc -%}
+
+{%- liquid
+  assign block_settings = block.settings
+  assign product_ref = closest.product
+  assign variant = product_ref.selected_or_first_available_variant
+
+  assign units_per_case = product_ref.metafields.custom.units_per_case.value | plus: 0
+  if units_per_case <= 0
+    assign units_per_case = block_settings.default_units_per_case
+  endif
+
+  assign tiers = product_ref.metafields.custom.product_price_table.value
+
+  assign source = 'none'
+  unless tiers == blank or tiers == empty
+    assign source = 'metafield'
+  endunless
+
+  if source == 'none' and product_ref.quantity_price_breaks_configured? and variant.quantity_price_breaks.size > 0
+    assign source = 'volume'
+  endif
+
+  if source == 'none'
+    if block_settings.show_sample_content or request.visual_preview_mode or request.design_mode
+      assign source = 'placeholder'
+    endif
+  endif
+-%}
+
+{%- if source != 'none' -%}
+  {% render 'product-data-table-styles' %}
+
+  <div
+    class="product-price-table spacing-style"
+    style="{% render 'spacing-style', settings: block_settings %}"
+    {{ block.shopify_attributes }}
+  >
+    <table class="product-data-table product-data-table--center">
+      <thead>
+        <tr>
+          <th scope="col">{{ block_settings.unit_quantity_heading | escape }}</th>
+          <th scope="col">{{ block_settings.unit_price_heading | escape }}</th>
+          <th scope="col">{{ block_settings.case_quantity_heading | escape }}</th>
+          <th scope="col">{{ block_settings.case_price_heading | escape }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {%- case source -%}
+          {%- when 'metafield' -%}
+            {%- for tier in tiers -%}
+              <tr>
+                <td>{{ tier.unit_quantity }}</td>
+                <td>{{ tier.unit_price }}</td>
+                <td>{{ tier.case_quantity }}</td>
+                <td>{{ tier.case_price }}</td>
+              </tr>
+            {%- endfor -%}
+
+          {%- when 'volume' -%}
+            {%- liquid
+              assign base_case_quantity = variant.quantity_rule.min | default: 1
+              assign base_unit_quantity = base_case_quantity | times: units_per_case
+              assign base_unit_price = variant.price | divided_by: units_per_case
+            -%}
+            <tr>
+              <td>{{ base_unit_quantity }}+</td>
+              <td>{{ base_unit_price | money }}</td>
+              <td>{{ base_case_quantity }}+</td>
+              <td>{{ variant.price | money }}</td>
+            </tr>
+            {%- for price_break in variant.quantity_price_breaks -%}
+              {%- liquid
+                assign case_quantity = price_break.minimum_quantity
+                assign unit_quantity = case_quantity | times: units_per_case
+                assign unit_price = price_break.price | divided_by: units_per_case
+              -%}
+              <tr>
+                <td>{{ unit_quantity }}+</td>
+                <td>{{ unit_price | money }}</td>
+                <td>{{ case_quantity }}+</td>
+                <td>{{ price_break.price | money }}</td>
+              </tr>
+            {%- endfor -%}
+
+          {%- when 'placeholder' -%}
+            {%- comment -%}
+              Cells are semicolon-separated: the values themselves contain thousands commas.
+            {%- endcomment -%}
+            {%- assign placeholder = '1000+;$0.22;1+;$220|8,000+;$0.20;8+;$200|18,000+;$0.18;18+;$180|36,000+;$0.17;36+;$170|72,000+;$0.16;72+;$160'
+              | split: '|'
+            -%}
+            {%- for placeholder_row in placeholder -%}
+              {%- assign cells = placeholder_row | split: ';' -%}
+              <tr>
+                <td>{{ cells[0] }}</td>
+                <td>{{ cells[1] }}</td>
+                <td>{{ cells[2] }}</td>
+                <td>{{ cells[3] }}</td>
+              </tr>
+            {%- endfor -%}
+        {%- endcase -%}
+      </tbody>
+    </table>
+  </div>
+{%- endif -%}
+
+{% stylesheet %}
+  .product-price-table {
+    width: 100%;
+  }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Product Price Table",
+  "tag": null,
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Rows come from the 'product_price_table' metafield (custom namespace, JSON list of {unit_quantity, unit_price, case_quantity, case_price}). Without it, the block falls back to the variant's Shopify volume pricing, expanding cases to units with the 'units_per_case' metafield."
+    },
+    {
+      "type": "header",
+      "content": "Column headings"
+    },
+    {
+      "type": "text",
+      "id": "unit_quantity_heading",
+      "label": "Unit quantity",
+      "default": "Unit Quantity"
+    },
+    {
+      "type": "text",
+      "id": "unit_price_heading",
+      "label": "Unit price",
+      "default": "Unit Price"
+    },
+    {
+      "type": "text",
+      "id": "case_quantity_heading",
+      "label": "Case quantity",
+      "default": "Case Quantity"
+    },
+    {
+      "type": "text",
+      "id": "case_price_heading",
+      "label": "Case price",
+      "default": "Case Price"
+    },
+    {
+      "type": "header",
+      "content": "Fallback"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_sample_content",
+      "label": "Show sample tiers on the storefront",
+      "info": "Renders the design's example tiers when the product has neither the metafield nor volume pricing. Turn this off once real pricing is in place — the theme editor always shows the sample.",
+      "default": false
+    },
+    {
+      "type": "number",
+      "id": "default_units_per_case",
+      "label": "Units per case",
+      "info": "Used when the product has no 'units_per_case' metafield.",
+      "default": 1000
+    },
+    {
+      "type": "header",
+      "content": "Padding"
+    },
+    {
+      "type": "range",
+      "id": "padding-block-start",
+      "label": "Top",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding-block-end",
+      "label": "Bottom",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 0
+    }
+  ],
+  "presets": [
+    {
+      "name": "Product Price Table",
+      "category": "Product"
+    }
+  ]
+}
+{% endschema %}

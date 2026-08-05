@@ -34,7 +34,7 @@
 {% render 'product-badges-styles' %}
 <product-recommendations
   id="product-recommendations-{{ block.id }}"
-  class="product-recommendations"
+  class="product-recommendations{% if block_settings.compact_pairs_style %} product-recommendations--pairs{% endif %}"
   data-url="{{ routes.product_recommendations_url }}?limit={{ block_settings.max_products }}"
   data-section-id="{{ section.id }}"
   data-product-id="{{ closest.product.id }}"
@@ -92,15 +92,52 @@
       {% capture list_items %}
         {% for product in products limit: block_settings.max_products %}
           <div class="resource-list__item">
-            {% content_for 'block',
-              type: '_product-card',
-              id: 'static-product-card',
-              closest.product: product
-            %}
+            {% if block_settings.compact_pairs_style and product != blank %}
+              <article class="pairs-card">
+                <a class="pairs-card__media" href="{{ product.selected_or_first_available_variant.url }}" aria-label="{{ product.title | escape }}">
+                  {% if product.featured_image != blank %}
+                    {{ product.featured_image | image_url: width: 240 | image_tag: loading: 'lazy', sizes: '96px', alt: product.featured_image.alt | default: product.title }}
+                  {% endif %}
+                </a>
+                <div class="pairs-card__details">
+                  <h3><a href="{{ product.selected_or_first_available_variant.url }}">{{ product.title | escape }}</a></h3>
+                  {% liquid
+                    assign pairs_units_per_case = product.metafields.custom.units_per_case.value | plus: 0
+                    if pairs_units_per_case <= 0
+                      assign pairs_units_per_case = 1000
+                    endif
+                    assign pairs_case_price = product.selected_or_first_available_variant.price
+                    assign pairs_unit_price = pairs_case_price | divided_by: pairs_units_per_case
+                  %}
+                  <dl class="pairs-card__prices">
+                    <div><dt>{{ block_settings.unit_price_label | escape }}</dt><dd>{{ pairs_unit_price | money }}</dd></div>
+                    <div><dt>{{ block_settings.case_price_label | escape }}</dt><dd>{{ pairs_case_price | money }}</dd></div>
+                  </dl>
+                </div>
+                <div class="pairs-card__actions">
+                  {% render 'quick-add', product: product, section_id: section.id, block: block, show_icon: false, style_class: 'button', add_to_cart_text: block_settings.add_label, force_add: true %}
+                  <a class="button-secondary pairs-card__view" href="{{ product.selected_or_first_available_variant.url }}">
+                    {{ block_settings.view_label | escape }}
+                    {{ 'icon-arrow-top-right-small.svg' | inline_asset_content }}
+                  </a>
+                </div>
+              </article>
+            {% else %}
+              {% content_for 'block',
+                type: '_product-card',
+                id: 'static-product-card',
+                closest.product: product
+              %}
+            {% endif %}
           </div>
           {% if block_settings.layout_type == 'carousel' or block_settings.carousel_on_mobile %}
             {% unless forloop.last %}
-              <!--@list/split-->
+              {% if block_settings.compact_pairs_style %}
+                {% assign pairs_group_modulo = forloop.index | modulo: 2 %}
+                {% if pairs_group_modulo == 0 %}<!--@list/split-->{% endif %}
+              {% else %}
+                <!--@list/split-->
+              {% endif %}
             {% endunless %}
           {% endif %}
         {% endfor %}
@@ -110,6 +147,8 @@
         # Create an array from the list items to be used in the carousel
         assign slide_content = list_items | strip
         assign slides = slide_content | split: '<!--@list/split-->'
+
+        assign recommendation_slide_count = slides.size
 
         if products != blank and products.size > 0
           assign has_recommendations = 'true'
@@ -138,7 +177,7 @@
             {% render 'resource-list-carousel',
               ref: 'resourceListCarousel',
               slides: slides,
-              slide_count: recommendations.products.size,
+              slide_count: recommendation_slide_count,
               settings: block_settings
             %}
         {% endcase %}
@@ -159,7 +198,7 @@
           {% render 'resource-list-carousel',
             ref: 'resourceListCarouselMobile',
             slides: slides,
-            slide_count: recommendations.products.size,
+            slide_count: recommendation_slide_count,
             settings: block_settings
           %}
         </div>
@@ -195,6 +234,271 @@
 
   .product-recommendations-wrapper:has(product-recommendations[data-shopify-editor-preview]) {
     width: 100vw;
+  }
+
+  .product-recommendations--pairs {
+    /* How far the carousel bleeds into the container padding so the cards' drop shadow
+       falls inside the scroller's clip — see the slideshow-slides note below. Kept under
+       the 20px padding, so the bleed stays inside the sand panel. */
+    --pairs-bleed: 16px;
+  }
+
+  .product-recommendations--pairs .block-resource-list {
+    gap: 16px;
+    padding: 20px;
+    /* base.css puts `border: 1px solid var(--color-border, currentColor)` on every direct
+       child of .product-recommendations. The design has no rule around the panel — the sand
+       fill is the whole edge — and with no --color-border set the fallback drew the panel's
+       own teal text colour as a hairline box. */
+    border: 0;
+    border-radius: 16px;
+    color: #064c4d;
+    background: #f7f1eb;
+  }
+
+  .product-recommendations--pairs .section-resource-list__content {
+    padding-block: 8px;
+    border-bottom: 1px solid #e6d7c3;
+  }
+
+  .product-recommendations--pairs .section-resource-list__content :is(h2, h3, p) {
+    margin: 0;
+    color: #064c4d;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  /*
+    Pre-hydration placeholder. Recommendations are fetched client-side, so this is what the
+    block reserves on first paint — and on the theme's own rules it reserved wildly too much.
+    .resource-list--grid asks for `grid-template-columns: var(--resource-list-columns)` above
+    750px and nothing in the theme ever defines that variable, so the declaration is invalid
+    at computed-value time and the grid falls back to a single column. Four placeholders at
+    `aspect-ratio: 3 / 4` and full container width stacked to several thousand pixels, then
+    the block collapsed the moment the fetch landed.
+
+    Mirror what the carousel actually settles into: the two cards of one slide, each the
+    109px media plus 12px of padding at top and bottom, 16px apart.
+  */
+  .product-recommendations--pairs .resource-list--grid { display: flex; flex-direction: column; gap: 16px; }
+  .product-recommendations--pairs .product-recommendations__skeleton-item { aspect-ratio: auto; height: 133px; border-radius: 16px; }
+  /* The block renders max_products placeholders, but a slide only ever shows two. The second
+     rule is what beats base.css's own mobile placeholder rule, which hides every odd child
+     and would otherwise leave a lone card here. */
+  .product-recommendations--pairs .product-recommendations__skeleton-item:nth-child(n + 3) { display: none; }
+  .product-recommendations--pairs .product-recommendations__skeleton-item:nth-child(-n + 2) { display: block; }
+
+  /*
+    slideshow-slides is a scroll container, so it clips at its own edges on both axes. The
+    card's shadow is offset 4px to the right and blurred 10px, and the slide is exactly as
+    wide as the scroller — so the entire right-hand side of the shadow was cut off, and the
+    only part left was the band the theme's `padding-block: 16px` had already made room for.
+    That surviving band is the straight line the shadow read as.
+
+    Bleed the carousel into the container's 20px padding and give the same width back as
+    slide padding: the card lands exactly where it did before, now with room on either side
+    for the shadow to fall inside the clip. The padding goes on the slide rather than on the
+    scroller deliberately — scrolling.js measures slides against the scroller's border box
+    and ignores scroll-padding, so padding there would offset every arrow click by the bleed.
+  */
+  /* `width: auto` is load-bearing: .resource-list pins `width: 100%`, and an explicit width
+     means the negative margins would slide the carousel sideways instead of widening it.
+     Auto lets it stretch to the container less its (negative) margins, i.e. 32px wider. */
+  .product-recommendations--pairs .resource-list--carousel { width: auto; margin-inline: calc(var(--pairs-bleed) * -1); }
+
+  .product-recommendations--pairs .resource-list__carousel slideshow-slides { gap: 16px; }
+  .product-recommendations--pairs .resource-list__carousel .resource-list__slide { --slide-width: 100%; width: 100%; height: auto; max-width: none; max-height: none; display: flex; flex: 0 0 100%; flex-direction: column; gap: 16px; padding-inline: var(--pairs-bleed); overflow: visible; contain: none; content-visibility: visible; }
+  /* Each slide stacks two cards. The carousel stretches every item to the full slide
+     height, so two items summed to twice the slide and the second one spilled out,
+     leaving a tall empty band under the first card. */
+  .product-recommendations--pairs .resource-list__slide > .resource-list__item { width: 100%; flex: 0 0 auto; height: auto; min-height: 0; }
+  /* The arrows are absolutely positioned against the carousel but need to sit in the
+     header row above it. The carousel starts 76px below the container top and the heading's
+     centre line is at 39.5px, so a 30px control centres on it at -51.5px. */
+  .product-recommendations--pairs .resource-list__carousel slideshow-arrows { inset: -51.5px var(--pairs-bleed) auto auto; z-index: 3; align-items: center; justify-content: flex-end; gap: 10px; padding: 0; mix-blend-mode: normal; pointer-events: none; }
+  /* The control is a flex box with default (normal) alignment, so the 20px glyph sat in the
+     top-right of the 30px circle instead of its centre. */
+  .product-recommendations--pairs .resource-list__carousel slideshow-arrows .slideshow-control { display: flex; align-items: center; justify-content: center; width: 30px; min-width: 30px; height: 30px; min-height: 30px; padding: 0; border: 1px solid #064c4d; border-radius: 50%; color: #064c4d; opacity: 1; pointer-events: auto; }
+  .product-recommendations--pairs .resource-list__carousel slideshow-arrows .slideshow-control svg { display: block; margin: 0; }
+  .product-recommendations--pairs .resource-list__carousel slideshow-arrows .slideshow-control[disabled] { display: flex; opacity: .35; }
+
+  /*
+    These arrows are not the theme's overlay controls. They sit in the header row and are
+    always visible, so the two behaviours base.css gives overlay arrows both read as flicker
+    here: `arrowsSlideIn` restarts from opacity 0 and 8px of travel every time the pointer
+    enters the carousel, and a drag hides them outright even though they are nowhere near
+    the track being dragged.
+
+    The animation cannot be outweighed by declaring opacity again — animated values beat
+    normal declarations whatever their specificity — so it has to be switched off, and the
+    selector has to outrank base.css's own (0,4,4).
+  */
+  .product-recommendations--pairs .resource-list .resource-list__carousel :is(slideshow-component:hover, slideshow-component:focus-within) slideshow-arrows .slideshow-control { animation: none; }
+  .product-recommendations--pairs .resource-list__carousel slideshow-component[dragging] slideshow-arrows { display: flex; }
+
+  .pairs-card {
+    display: grid;
+    grid-template-columns: 87px minmax(0, 1fr) 148px;
+    align-items: center;
+    gap: 24px;
+    padding: 12px 14px;
+    border-radius: 16px;
+    color: #064c4d;
+    background: #fff;
+    /* Figma 2123:458 — a drop shadow, so `filter` rather than `box-shadow`: it follows the
+       16px corner radius instead of the border box. Whichever is used, it only reads as a
+       shadow if the scroller around it has room to paint — see --pairs-bleed above. */
+    filter: drop-shadow(4px 4px 10px rgb(0 0 0 / .12));
+  }
+
+  .pairs-card__media { display: block; width: 87px; height: 109px; overflow: hidden; border-radius: 8px; background: #f7f1eb; }
+  .pairs-card__media img { width: 100%; height: 100%; object-fit: cover; }
+  .pairs-card__details { display: flex; align-self: stretch; flex-direction: column; justify-content: space-between; min-width: 0; }
+  .pairs-card__details h3 { margin: 0; padding-left: 4px; font-size: 18px; font-weight: 600; line-height: 1.25; }
+  .pairs-card__details h3 a { color: inherit; text-decoration: none; }
+  .pairs-card__prices { display: flex; flex-direction: column; gap: 0; margin: 0; padding: 8px 16px; border-radius: 12px; background: #f0fdfa; font-size: 14px; line-height: 1.5; }
+  .pairs-card__prices div { display: flex; justify-content: space-between; gap: 12px; }
+  .pairs-card__prices dd { margin: 0; }
+  .pairs-card__actions { display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+  .pairs-card__actions .quick-add { position: static; inset: auto; width: 100%; pointer-events: auto; }
+  .pairs-card__actions product-form-component, .pairs-card__actions form { width: 100%; height: auto; }
+  .pairs-card__actions .quick-add__product-form-component .shopify-product-form { display: block; height: auto; }
+  /* nowrap + tighter inline padding: "View Product" plus its arrow does not fit on one
+     line inside the 148px action column at 20px padding, and was breaking in two.
+
+     `relative` with auto insets, not `static`: it lays out identically in flow — which is all
+     that was wanted, to undo quick-add's absolute positioning — but it also keeps the button
+     as the containing block for the theme's hover fill, an absolutely positioned ::before.
+     `filter` on .pairs-card makes the card itself a containing block, so a static button
+     would have handed the fill the whole card to size against. */
+  .pairs-card__actions .quick-add__button, .pairs-card__view { position: relative; inset: auto; display: flex; width: 100%; min-height: 38px; height: 38px; padding: 10px 12px; border-radius: 80px; opacity: 1; font-size: 14px; font-weight: 600; line-height: normal; letter-spacing: .02em; white-space: nowrap; scale: 1; transform: none; translate: none; }
+  /* Figma 2144:546 draws this pill as a flat teal fill with no ring, but the theme's primary
+     button token puts a 1.6px rgba(0,0,0,.15) border on it. Besides being a stray dark edge
+     on a dark pill, the border is what the hover fill stops at — an absolutely positioned
+     ::before sizes to the padding box — so it left a teal crescent around the cap that the
+     wipe could never reach. */
+  .pairs-card__actions .quick-add__button { --button-fill-color: #fff; --button-fill-under: #064c4d; border: 0; color: #fff; background: #064c4d; }
+  .pairs-card__actions [data-quick-add-button='add'] .quick-add__button--choose { display: none; }
+  .pairs-card__actions .quick-add__button .add-to-cart-text { width: 100%; justify-content: center; color: #fff; background: transparent; }
+  .pairs-card__actions .quick-add__button .add-to-cart-text::after { content: '+'; margin-inline-start: 10px; font-size: 18px; font-weight: 400; line-height: 1; }
+  /* quick-add.liquid hard-codes icon_only_on_mobile, which tags the label
+     .is-visually-hidden-mobile and lets base.css clip it away under 750px — leaving this pill
+     showing a bare "+", because the plus is an ::after on the parent and escapes the clip.
+     The design carries the label at every width, so undo the clip. `position` has to come
+     back !important because that is how base.css sets it. */
+  .pairs-card__actions .quick-add__button .add-to-cart-text__content { position: static !important; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; grid-template-columns: 1fr; }
+  .pairs-card__actions .quick-add__button .add-to-cart-text__content > span > span { padding: 0; opacity: 1; filter: none; translate: 0 0; }
+  /* The checkmark burst is authored for the 48px PDP button and ships in a 32px box, which
+     inside this 38px pill left its rays crossing the button's own `overflow: hidden` and
+     tearing. Same size-down the Related Products pill uses: base.css caps every svg at
+     max-width: 100%, so bringing the wrapper in brings the 30px glyph with it.
+
+     The burst is absolutely positioned and centred on its containing block, so it was also
+     landing in the middle of the whole card until the button became `position: relative`
+     above — `filter` on .pairs-card had been acting as the containing block. */
+  .pairs-card__actions .quick-add__button .add-to-cart__added-icon { width: 24px; height: 24px; }
+  /*
+    quick-add-styles reuses ::before on this button as a "hover stabiliser" — an invisible box
+    at `inset: -10px` that widens the hit area of the quick-add badge floating over a product
+    card. base.css uses that same ::before for the button fill, so on hover the stabiliser's
+    offsets replaced the fill's own: `left: -10px` against the fill's `width: 100%` leaves the
+    box over-constrained, the inline-end offset is dropped, and the fill ends up sitting 10px
+    to the left of the pill. The last 10px of the right cap therefore never got painted, which
+    is the crescent the wipe appeared to stop short of. Only the 3-column card showed it — the
+    narrow card stacks the actions, where the pill is wide enough for 10px to read as a sliver.
+
+    Restoring base.css's offsets costs nothing: the stabiliser is for a floating badge, and
+    base.css marks this pseudo pointer-events: none, so it was never a hit area here.
+
+    The 1.03 hover scale goes for the same reason `scale: 1` is set above — also a floating
+    badge affordance, and here it only made the Add pill wider than the View Product pill
+    directly beneath it.
+  */
+  .pairs-card__actions .quick-add__button:hover::before { inset-block: auto -100%; inset-inline: 0 auto; }
+  .pairs-card__actions .quick-add__button:hover { scale: 1; }
+
+  .pairs-card__view { --button-fill-color: #064c4d; --button-fill-under: #fff; align-items: center; justify-content: center; gap: 10px; border: 1px solid #064c4d; color: #064c4d; background: #fff; text-decoration: none; }
+  .pairs-card__view svg { width: 10px; height: 10px; --stroke-0: #064c4d; }
+
+  /*
+    Hover. The theme wipes an elliptical fill up over any .button / .button-secondary and
+    swaps --button-color underneath it, but both buttons above pin `color` and `background`
+    directly, so neither half of that contract reached them. The label kept its resting
+    colour; the fill painted --color-primary/secondary-button-hover-background, whatever the
+    merchant's global button settings happen to be; and the button's own background jumped
+    to the theme's colour on hover, because base.css holds it at --button-fill-under at
+    (0,3,0) and the rules above are only (0,2,0).
+
+    So the fill variables are set here too, each next to the background it mirrors — which is
+    what base.css asks of any button that styles itself rather than inheriting the palette.
+    The pair trades places on hover: the solid pill wipes white and its label goes teal, the
+    outline pill wipes teal and its label goes white. Same move .related-card__atc makes in
+    the Related Products section.
+  */
+  .pairs-card__actions .quick-add__button:is(:hover, :focus-visible),
+  .pairs-card__actions .quick-add__button:is(:hover, :focus-visible) .add-to-cart-text,
+  .pairs-card__actions .quick-add__button:is(:hover, :focus-visible) .add-to-cart-text__content > span > span { color: #064c4d; opacity: 1; filter: none; translate: 0 0; }
+
+  /*
+    The hovered pill is white on a white card, so it needs an edge — and without one drawn on
+    purpose it grew a stray one. The button paints its teal background and the white fill
+    paints over it, but both are clipped by the same `overflow: hidden` pill, and each is
+    antialiased against it separately: along the cap the two partial coverages composite into
+    a faint teal fringe, thinner and lighter than any border anyone chose.
+
+    Drawing the ring deliberately covers that seam and finishes the trade with
+    .pairs-card__view, which lands on this exact edge going the other way (its own 1px border
+    is what hides the same seam on the outline pill).
+
+    `outline`, because that is how base.css draws a button's ring — which is also why the
+    `border: 0` above never removed one. It paints above the fill, so the ring stays crisp
+    through the wipe, and it inherits the `outline` transition base.css already declares. The
+    negative offset pulls it inside the border box: base.css would compute 0 here, which
+    would hang the ring outside the pill and leave it 2px wider than the View Product pill
+    directly beneath it.
+  */
+  .pairs-card__actions .quick-add__button:is(:hover, :focus-visible) {
+    --button-border-width: 1px;
+    --button-border-color: #064c4d;
+
+    outline-offset: -1px;
+  }
+
+  .pairs-card__view:is(:hover, :focus-visible) { color: #fff; border-color: #064c4d; }
+  .pairs-card__view:is(:hover, :focus-visible) svg { --stroke-0: #fff; }
+
+  /*
+    Added state. The burst starts the instant the button flips, but quick-add-styles fades the
+    label out over 125ms underneath it — so for the first eighth of a second the ring pops
+    through the middle of the word, which reads as a rendering fault rather than a transition.
+    The label leaves outright instead, clearing the pill before the burst's first frame.
+
+    Three things have to be cleared for that to hold. `animation`, because an animation's own
+    values outrank a normal declaration — opacity alone would be overwritten by atc-fade-out's
+    for all 125ms of it. `transition`, because the label carries one and would otherwise ramp
+    to 0 over its duration, which is the same overlap in a different costume. And this rule
+    has to sit *below* the hover block: adding to cart leaves the pointer on the pill, and the
+    hover rule pins .add-to-cart-text to opacity 1 at exactly the same specificity — a tie that
+    source order, not the cascade, decides.
+  */
+  .pairs-card__actions .quick-add__button[data-added='true'] .add-to-cart-text {
+    animation: none;
+    transition: none;
+    opacity: 0;
+  }
+
+  @container resource-list (max-width: 520px) {
+    .product-recommendations--pairs .block-resource-list { padding: 20px; }
+    .pairs-card { grid-template-columns: 87px minmax(0, 1fr); gap: 16px 24px; padding: 12px 14px; }
+    .pairs-card__media { width: 87px; height: 109px; }
+    .pairs-card__actions { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; }
+    .pairs-card__details { justify-content: center; gap: 8px; }
+    .pairs-card__details h3 { font-size: 18px; }
+    .pairs-card__prices { padding: 8px 16px; }
+    /* The actions drop to their own row here, so the placeholder grows by that row and the
+       16px above it: 12 + 109 + 16 + 38 + 12. */
+    .product-recommendations--pairs .product-recommendations__skeleton-item { height: 187px; }
   }
 {% endstylesheet %}
 
@@ -234,6 +538,40 @@
     {
       "type": "paragraph",
       "content": "t:content.complementary_products"
+    },
+    {
+      "type": "checkbox",
+      "id": "compact_pairs_style",
+      "label": "Use Pairs well with design",
+      "default": false
+    },
+    {
+      "type": "text",
+      "id": "unit_price_label",
+      "label": "Unit price label",
+      "default": "Per Unit",
+      "visible_if": "{{ block.settings.compact_pairs_style }}"
+    },
+    {
+      "type": "text",
+      "id": "case_price_label",
+      "label": "Case price label",
+      "default": "Per Case",
+      "visible_if": "{{ block.settings.compact_pairs_style }}"
+    },
+    {
+      "type": "text",
+      "id": "add_label",
+      "label": "Add button label",
+      "default": "Add",
+      "visible_if": "{{ block.settings.compact_pairs_style }}"
+    },
+    {
+      "type": "text",
+      "id": "view_label",
+      "label": "View button label",
+      "default": "View Product",
+      "visible_if": "{{ block.settings.compact_pairs_style }}"
     },
     {
       "type": "header",
