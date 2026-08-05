@@ -34,7 +34,7 @@
             "thumbnail_width": 87,
             "max_thumbnails": 6,
             "show_mobile_scroll_indicator": true,
-            "aspect_ratio": "adapt",
+            "aspect_ratio": "1/1.25",
             "constrain_to_viewport": true,
             "sticky_media_desktop": true,
             "media_fit": "cover",

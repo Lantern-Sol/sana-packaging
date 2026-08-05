@@ -253,6 +253,19 @@
     padding-block: max(64px, calc(var(--spacing-scale, 1) * 5rem));
   }
 
+  /* The nav bar is full-bleed on a fixed 80px gutter (Figma Navigation/Desktop 2001:385, via
+     --nav-bar-padding-inline), and the footer, the product section and the customization panels
+     all sit on 80 as well; this section was still on the theme's default --page-margin of 50px,
+     so the heading and the card grid overhung the header's content box by 30px each side.
+     __inner already reads the gutter for its own padding-inline and max-width, so moving the
+     variable is enough — no rule here needs to know the number. Desktop only: below 750px the
+     columns stack and run to the theme's mobile margin. */
+  @media screen and (min-width: 750px) {
+    .sustainability-impact {
+      --page-margin: 80px;
+    }
+  }
+
   /* ─────────────────────────────────────────────────
      Inner wrapper — two-column grid on desktop
      ───────────────────────────────────────────────── */
