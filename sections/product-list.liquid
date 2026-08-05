@@ -88,6 +88,26 @@
 </div>
 
 {% stylesheet %}
+  /* The nav bar is full-bleed on a fixed 80px gutter (Figma Navigation/Desktop 2001:385, via
+     --nav-bar-padding-inline), and the footer, the newsletter and the sections either side of
+     this one all sit on 80 as well; this one was still on the theme's default --page-margin of
+     50px, so its heading and card grid ran 30px past the header's content box on each side.
+
+     --page-width has to move with the margin. base.css derives it once, up at the .page-width-*
+     level, as `content-width + margin * 2`, and a section's central column is
+     `min(page-width - margin * 2, 100% - margin * 2)` — so overriding the margin alone leaves
+     the first term built from 50 and subtracted with 80, capping the content 60px under the
+     90rem the design asks for on windows wide enough for that term to win. Restating the same
+     formula here rebuilds it against the new gutter, so only the gutter moves and the cap holds.
+
+     Desktop only: below 750px the section runs to the theme's mobile margin, as it already did. */
+  @media screen and (min-width: 750px) {
+    .section-resource-list {
+      --page-margin: 80px;
+      --page-width: calc(var(--page-content-width) + (var(--page-margin) * 2));
+    }
+  }
+
   /* base.css sets `.section-resource-list { row-gap: var(--gap) }` with equal specificity and
      later source order, so the doubled class is what makes the mobile value win. */
   @media screen and (max-width: 749px) {

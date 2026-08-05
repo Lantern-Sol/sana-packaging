@@ -259,10 +259,17 @@
      so the heading and the card grid overhung the header's content box by 30px each side.
      __inner already reads the gutter for its own padding-inline and max-width, so moving the
      variable is enough — no rule here needs to know the number. Desktop only: below 750px the
-     columns stack and run to the theme's mobile margin. */
+     columns stack and run to the theme's mobile margin.
+
+     --page-width is restated because base.css derives it once, up at the .page-width-* level, as
+     `content-width + margin * 2`. The central column is `min(page-width - margin * 2, 100% -
+     margin * 2)`, so moving the margin alone leaves the first term built from 50 and subtracted
+     with 80 — which caps the content 60px under the 90rem the design asks for once the window is
+     wide enough for that term to win. */
   @media screen and (min-width: 750px) {
     .sustainability-impact {
       --page-margin: 80px;
+      --page-width: calc(var(--page-content-width) + (var(--page-margin) * 2));
     }
   }
 

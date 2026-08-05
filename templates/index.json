@@ -4046,6 +4046,7 @@
         "use_mobile_gap": true,
         "mobile_gap": 32,
         "section_width": "page-width",
+        "nav_gutter": true,
         "section_height": "",
         "section_height_custom": 50,
         "background_media": "none",

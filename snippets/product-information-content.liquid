@@ -137,10 +137,17 @@
      Overriding the gutter rather than adding padding keeps the section's own
      margin / content / margin grid in charge of the centring, so the capped content column and
      the full-bleed .section-background both still behave. Desktop only: below 750px the page
-     margin is 12px against the bar's 24px, but the gallery there is edge-to-edge by design. */
+     margin is 12px against the bar's 24px, but the gallery there is edge-to-edge by design.
+
+     --page-width is restated because base.css derives it once, up at the .page-width-* level, as
+     `content-width + margin * 2`. The central column is `min(page-width - margin * 2, 100% -
+     margin * 2)`, so moving the margin alone leaves the first term built from 50 and subtracted
+     with 80 — which caps the content 60px under the 90rem the design asks for once the window is
+     wide enough for that term to win. */
   @media screen and (min-width: 750px) {
     .product-information {
       --page-margin: 80px;
+      --page-width: calc(var(--page-content-width) + (var(--page-margin) * 2));
     }
   }
 
