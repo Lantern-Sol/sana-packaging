@@ -635,7 +635,7 @@
                         "unit_price_heading": "Unit Price",
                         "case_quantity_heading": "Case Quantity",
                         "case_price_heading": "Case Price",
-                        "show_sample_content": false,
+                        "show_sample_content": true,
                         "default_units_per_case": 1000,
                         "padding-block-start": 0,
                         "padding-block-end": 0
