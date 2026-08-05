@@ -703,6 +703,27 @@
     }
   }
 
+  /*
+    The same leftover `top` bites below 750px, where nothing had cleared it. base.css's
+    `.media-gallery--carousel { position: relative }` beats `.sticky-content`'s `position`
+    on every viewport, so the gallery is never actually sticky here — but `.sticky-content`'s
+    `top: var(--sticky-header-offset)` survives, and product-information-content.liquid sets
+    that variable to the header height as soon as the header reports
+    `data-sticky-state="active"`. On a relatively positioned element a `top` shifts the box
+    visually without moving anything in flow, so the moment the page is scrolled the gallery
+    slides a header-height down and — carrying `.sticky-content`'s z-index — paints over the
+    highlights strip stacked below it. The strip appears to collapse under the image.
+
+    Kept as its own rule rather than lifting `top: auto` out of the desktop block: up there it
+    is one half of a deliberate pair that also has to undo `position`, and only for the
+    highlights case.
+  */
+  @media screen and (max-width: 749px) {
+    .product-information__media media-gallery.media-gallery--sticky {
+      top: auto;
+    }
+  }
+
   /* ==========================================================================
      Sana product image slider — Figma 2123:177 (desktop) / 2123:1597 (mobile).
      ========================================================================== */
@@ -924,9 +945,18 @@
       border: 0;
       border-radius: 0;
       background: #f0fdfa;
+      /*
+        The five highlights are ~1000px of chips in a ~366px box, so mobile scrolls them
+        sideways instead of wrapping (desktop still wraps — see the base rule above).
+
+        No snapping: with `scroll-snap-type: inline proximity` and every chip aligned to
+        `start`, any drag shorter than half a chip was pulled back to the chip it started
+        on, which reads as "the strip doesn't scroll". Free scrolling is also what the
+        thumbnail rail above it does, so the two behave the same under the thumb.
+      */
       overflow-x: auto;
+      overflow-y: hidden;
       overscroll-behavior-inline: contain;
-      scroll-snap-type: inline proximity;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
     }
@@ -940,7 +970,6 @@
       padding: 0;
       gap: 12px;
       background: transparent;
-      scroll-snap-align: start;
     }
 
     .product-highlights__icon {

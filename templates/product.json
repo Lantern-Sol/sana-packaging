@@ -979,7 +979,7 @@
         "mobile_gap": 40,
         "enable_sticky_add_to_cart": true,
         "background_color": "",
-        "padding-block-start": 80,
+        "padding-block-start": 32,
         "padding-block-end": 80,
         "use_mobile_padding": true,
         "padding-block-start-mobile": 0,
