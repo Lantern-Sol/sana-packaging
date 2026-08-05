@@ -783,7 +783,7 @@
                       "settings": {
                         "label_heading": "Spec Type",
                         "value_heading": "Product Spec",
-                        "show_sample_content": false,
+                        "show_sample_content": true,
                         "show_doc_link": true,
                         "doc_label": "View Full Product Specs & Technical Drawings",
                         "doc_new_tab": true,
