@@ -239,16 +239,37 @@
     .product-faq__catalog .rte { font-size: 14px; font-weight: 600; }
   }
 
+  /* Opt-in, via the section's "Align to navigation gutter" setting: sit the content on the nav
+     bar's gutter rather than the theme's page margin. The bar is full-bleed on a fixed 80px
+     (Figma Navigation/Desktop 2001:385, via --nav-bar-padding-inline) and the footer, the
+     newsletter and the product list all sit on 80 too, so a section left on the theme's default
+     50px runs 30px past the header's content box on each side. A setting rather than a blanket
+     rule on the section type, because the generic section is used for layouts that are not part
+     of that grid. See the note below for why --page-width moves with the margin. */
+  @media screen and (min-width: 750px) {
+    .section--nav-gutter {
+      --page-margin: 80px;
+      --page-width: calc(var(--page-content-width) + (var(--page-margin) * 2));
+    }
+  }
+
   /* The nav bar is full-bleed on a fixed 80px gutter (Figma Navigation/Desktop 2001:385, via
      --nav-bar-padding-inline) and the footer and the product section above both sit on 80 as
      well; this section was still on the theme's default --page-margin of 50px, so the two
      panels overhung the header's content box by 30px each side. Overriding the gutter keeps the
      section's own margin / content / margin grid in charge of the centring, and scoping it to
      the panels class leaves every other use of the generic section type alone. Desktop only —
-     below 750px the panels stack and run to the theme's mobile margin. */
+     below 750px the panels stack and run to the theme's mobile margin.
+
+     --page-width is restated because base.css derives it once, up at the .page-width-* level, as
+     `content-width + margin * 2`. The central column is `min(page-width - margin * 2, 100% -
+     margin * 2)`, so moving the margin alone leaves the first term built from 50 and subtracted
+     with 80 — which caps the content 60px under the 90rem the design asks for once the window is
+     wide enough for that term to win. */
   @media screen and (min-width: 750px) {
     .section--customization-panels {
       --page-margin: 80px;
+      --page-width: calc(var(--page-content-width) + (var(--page-margin) * 2));
     }
   }
 
@@ -393,11 +414,13 @@
   }
 
   /* Same gutter as the nav bar, the footer and the sections above it — see the note on
-     .section--customization-panels. The four chips are laid out with `space-between`, so the row
-     only reads as aligned if the track itself starts and ends on the header's content box. */
+     .section--customization-panels, including why --page-width moves with it. The four chips are
+     laid out with `space-between`, so the row only reads as aligned if the track itself starts
+     and ends on the header's content box. */
   @media screen and (min-width: 750px) {
     .section--subfooter-icons {
       --page-margin: 80px;
+      --page-width: calc(var(--page-content-width) + (var(--page-margin) * 2));
     }
   }
 
@@ -523,6 +546,13 @@
       "id": "clip_content",
       "label": "Clip overflowing content",
       "info": "Crops anything that spills outside the section, so blocks with negative margins bleed off the edge instead of overlapping neighbouring sections.",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "nav_gutter",
+      "label": "Align to navigation gutter",
+      "info": "Sits the section's content on the same 80px gutter as the navigation bar and footer, instead of the theme's page margin. Desktop only.",
       "default": false
     },
     {
