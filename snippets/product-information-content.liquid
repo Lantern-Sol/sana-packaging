@@ -128,6 +128,22 @@
     gap: var(--gap) 0;
   }
 
+  /* The nav bar is full-bleed with a fixed 80px gutter (Figma Navigation/Desktop 2001:385, via
+     --nav-bar-padding-inline), and the sections further down the product page — related products,
+     the customization panel, the footer — are all set to 80 too. This one was left on the theme's
+     default --page-margin of 50px, so the thumbnail rail and the details column overhung the
+     header's content box by 30px on each side and nothing on the page lined up.
+
+     Overriding the gutter rather than adding padding keeps the section's own
+     margin / content / margin grid in charge of the centring, so the capped content column and
+     the full-bleed .section-background both still behave. Desktop only: below 750px the page
+     margin is 12px against the bar's 24px, but the gallery there is edge-to-edge by design. */
+  @media screen and (min-width: 750px) {
+    .product-information {
+      --page-margin: 80px;
+    }
+  }
+
   /* Base grid layout */
   .product-information__grid {
     display: grid;
@@ -323,8 +339,11 @@
     }
   }
 
-  /* If the header is sticky, make product details content stick underneath the header */
+  /* If the header is sticky, make product details content stick underneath the header.
+     The media side is pinned at the column rather than at the gallery — see the sticky block in
+     _product-media-gallery.liquid — so the offset has to land on the column too. */
   body:has(#header-group #header-component[data-sticky-state='active']) .product-details.sticky-content--desktop,
+  body:has(#header-group #header-component[data-sticky-state='active']) .product-information__media,
   body:has(#header-group #header-component[data-sticky-state='active']) media-gallery.media-gallery--sticky {
     --sticky-header-offset: var(--header-height);
   }

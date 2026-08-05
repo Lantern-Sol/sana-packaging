@@ -239,6 +239,19 @@
     .product-faq__catalog .rte { font-size: 14px; font-weight: 600; }
   }
 
+  /* The nav bar is full-bleed on a fixed 80px gutter (Figma Navigation/Desktop 2001:385, via
+     --nav-bar-padding-inline) and the footer and the product section above both sit on 80 as
+     well; this section was still on the theme's default --page-margin of 50px, so the two
+     panels overhung the header's content box by 30px each side. Overriding the gutter keeps the
+     section's own margin / content / margin grid in charge of the centring, and scoping it to
+     the panels class leaves every other use of the generic section type alone. Desktop only —
+     below 750px the panels stack and run to the theme's mobile margin. */
+  @media screen and (min-width: 750px) {
+    .section--customization-panels {
+      --page-margin: 80px;
+    }
+  }
+
   /* Two panels sitting flush inside one rounded, clipped container. Existing group
      settings cover colour, padding and content; these rules only add what they can't:
      equal-height stretch, the diagonal accent gradient, and the decorative image bleed. */
@@ -253,10 +266,44 @@
   }
 
   /* The leading panel butts against the accent panel, so its trailing corners stay square
-     and the wrapper's own radius supplies the outer curve. */
-  .section--customization-panels > .custom-section-content > .section-content-wrapper > .group-block:first-child {
+     and the wrapper's own radius supplies the outer curve.
+
+     `:first-of-type`, not `:first-child`: the wrapper's first element child is the block-scoped
+     <style> tag the block renderer emits, so `.group-block:first-child` matches nothing and this
+     rule and the mobile one below were both silently dead. The panels are the only DIVs in
+     there, so first-of-type is the leading one. */
+  .section--customization-panels > .custom-section-content > .section-content-wrapper > .group-block:first-of-type {
+    position: relative;
     border-start-end-radius: 0;
     border-end-end-radius: 0;
+  }
+
+  /* Figma 2123:556 lays the accent panel over the leading one rather than beside it: its left
+     corners are rounded, and the wedges outside those corners are filled with the leading
+     panel's teal. Butted flush, the wedges expose whatever is behind the pair — the section's
+     cream — so the seam reads as a pale notch top and bottom instead of an overlap.
+
+     A box-shadow, not a pseudo-element or a width change:
+
+     - The block renderer puts `overflow: hidden` in the panel's *inline* style, so anything
+       drawn outside its box (a ::after at `inset-inline-start: 100%`) is clipped away, and
+       inline styles can only be beaten with !important. An element's own box-shadow is not
+       clipped by its overflow, so it slips past that.
+     - Both panels are sized from their block settings (60/40). Widening the leading one
+       re-flows its copy, and pulling the accent left with a negative margin drags it off the
+       wrapper's right edge and opens the same gap on the other side. A shadow paints outside
+       layout entirely, so both keep the widths the merchant set.
+
+     Offset by the accent's own 32px radius — exactly the strip that shows — and coloured from
+     --color-background, the variable the panel's colour setting writes, so an editor colour
+     change carries over. The rest of the shadow is covered by the opaque accent above it. */
+  @media screen and (min-width: 750px) {
+    .section--customization-panels
+      > .custom-section-content
+      > .section-content-wrapper
+      > .group-block:first-of-type {
+      box-shadow: 32px 0 0 0 var(--color-background);
+    }
   }
 
   .section--customization-panels > .custom-section-content > .section-content-wrapper > .group-block:last-child {
@@ -327,10 +374,13 @@
       min-height: 0;
     }
 
-    /* Stacked on mobile, so the leading panel gets its corners back. */
-    .section--customization-panels > .custom-section-content > .section-content-wrapper > .group-block:first-child {
-      border-start-end-radius: 24px;
-      border-end-end-radius: 24px;
+    /* Stacked on mobile, so the leading panel gets its corners back — at whatever the block's
+       own corner setting is, not a literal 24px. Its leading corners come from that setting
+       (32px as configured) via an inline custom property, and while this rule was dead the two
+       matched by default; hard-coding 24 here would now leave the panel lopsided. */
+    .section--customization-panels > .custom-section-content > .section-content-wrapper > .group-block:first-of-type {
+      border-start-end-radius: var(--border-radius-mobile, 24px);
+      border-end-end-radius: var(--border-radius-mobile, 24px);
     }
 
     .section--customization-panels .image-block {
@@ -340,6 +390,15 @@
 
   .section--subfooter-icons {
     background: linear-gradient(123deg, #f7f1eb 24%, #e6d7c3 91%);
+  }
+
+  /* Same gutter as the nav bar, the footer and the sections above it — see the note on
+     .section--customization-panels. The four chips are laid out with `space-between`, so the row
+     only reads as aligned if the track itself starts and ends on the header's content box. */
+  @media screen and (min-width: 750px) {
+    .section--subfooter-icons {
+      --page-margin: 80px;
+    }
   }
 
   .section--subfooter-icons .custom-section-background {

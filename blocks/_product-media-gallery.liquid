@@ -657,47 +657,54 @@
 
 {% stylesheet %}
   /*
-    Pin the gallery beside the details column on desktop — but only where nothing follows it
-    down the media column.
+    Pin the media column beside the details column on desktop, so the photo stays in view while
+    the long details column scrolls.
 
-    The block markup has always carried `.sticky-content`, but base.css also ships
-    `.media-gallery--carousel { position: relative }` further down the same file, and at
-    equal specificity the later rule wins — so in the carousel presentation the gallery
-    never actually stuck. Qualifying with the element name clears that rule and the fact
-    that base.css is emitted after this stylesheet.
+    Pinned at the column, not at the gallery. `.sticky-content` on <media-gallery> was the
+    theme's own attempt at this and it never worked — base.css ships
+    `.media-gallery--carousel { position: relative }` later in the same file, and at equal
+    specificity the later rule wins. Fixing that by pinning the gallery alone is worse than not
+    pinning it: the highlights strip is a sibling below it in the same column, so it would keep
+    scrolling, slide behind the pinned gallery and never be readable. Pinning
+    `.product-information__media` takes the gallery and the strip up together as one box.
 
-    The highlights strip is what "nothing follows it" rules out. It sits below the gallery in
-    the same column and is not part of the pinned box, so it keeps scrolling and travels
-    behind it — and base.css sizes the gallery to `max(500px, 100vh - header)`, which leaves
-    no gap under the pinned gallery for it to be read in on the way past. It went from below
-    the fold straight to behind the gallery without ever being on screen. Both only fit the
-    viewport at once if the photo shrinks, so on these products the column scrolls instead
-    and the photo keeps its size.
+    `align-self: start` is what makes it possible at all — a grid item stretches to the row
+    height (1901px against a 973px column here), and a box as tall as its own scroll range has
+    nothing to stick through.
 
-    Desktop only: below 750px the grid stacks, where a pinned gallery would ride down over
-    the details it is meant to sit beside.
+    Trade-off worth knowing: gallery 735 + 24 + strip means the column runs ~973px, and a
+    900px-tall window only has ~790 under the header. The photo is what stays whole — the
+    bottom of the strip sits below the fold while pinned, and comes back as soon as the column
+    releases at the end of the row. Anchoring the other way (bottom-aligned, so the strip
+    always shows) buries the top of the photo under the header, which is the wrong thing to
+    lose on a product page.
+
+    Gated on `.media-gallery--sticky` so the block's own "Sticky media on desktop" setting still
+    switches it off, and desktop-only: below 750px the grid stacks and a pinned column would
+    ride down over the details it is meant to sit beside.
   */
   @media screen and (min-width: 750px) {
-    .product-information__media:not(:has(.product-highlights)) media-gallery.media-gallery--sticky {
+    .product-information__media:has(media-gallery.media-gallery--sticky) {
       position: sticky;
       top: var(--sticky-header-offset, 0);
+      align-self: start;
       z-index: var(--layer-flat);
 
       /*
-        The gallery's own box is largely transparent (the thumbnail rail is a column of
-        gaps), so anything passing underneath shows through those gaps rather than
-        disappearing under it. --color-background is the token .section-background already
-        paints, so this is a no-op visually until something actually does.
+        The column's box is largely transparent (the thumbnail rail is a column of gaps), so
+        anything passing underneath shows through those gaps rather than disappearing under it.
+        --color-background is the token .section-background already paints, so this is a no-op
+        visually until something actually does.
       */
       background-color: var(--color-background);
     }
 
     /*
-      `.sticky-content` sets `top` as well as `position`, and the carousel rule that clears
-      the one leaves the other standing — so the gallery would sit 110px down its own box
-      and cover the top of the strip. Clear both.
+      `.sticky-content` sets `top` as well as `position`, and the carousel rule that clears the
+      one leaves the other standing — so the gallery would sit a header-height down inside the
+      now-pinned column and cover the top of the strip. Clear both.
     */
-    .product-information__media:has(.product-highlights) media-gallery.media-gallery--sticky {
+    .product-information__media media-gallery.media-gallery--sticky {
       position: relative;
       top: auto;
     }
@@ -728,11 +735,59 @@
      Sana product image slider — Figma 2123:177 (desktop) / 2123:1597 (mobile).
      ========================================================================== */
 
+  /* Figma 2123:177 draws the whole slider 702 wide — an 87px thumbnail rail, a 27px gutter and
+     a 588 x 735 main image (2123:226, exactly 1/1.25).
+
+     Those are absolute widths, and the theme's media track is wider than the Figma one: the
+     column split in _product-details.liquid is the literal Figma ratio (702fr / 512fr), but it
+     divides a content column that runs to 90rem where Figma's is 1280, so the same ratio hands
+     the gallery 795px at 1920 and the image comes out 692 x 864 — tall enough to fill the
+     viewport. Capping at the design width pins the image back to 588 x 735 at every desktop
+     size; the leftover track (93px at 1920, 29px at 1440) stays as gutter beside the details.
+
+     The highlights strip is capped with it so the two stay flush — it is a sibling in the same
+     track, not a child of the gallery. */
+  @media screen and (min-width: 750px) {
+    .product-information__media > media-gallery,
+    .product-information__media > .product-highlights {
+      max-width: 702px;
+    }
+
+    /* base.css sets this gutter to 1rem for every thumbnail carousel; Figma's is 27px (the rail
+       is 87 wide and the image starts at x=114), and it is what makes 702 - 87 land on 588. */
+    .product-information__media .media-gallery--carousel
+      slideshow-component:has(slideshow-controls[thumbnails]) {
+      column-gap: 27px;
+    }
+  }
+
   /* Figma rounds the main image 24px and each thumbnail 8px. `--media-radius` is published by
      the gallery from its setting but only consumed by the other gallery snippet, so the
      carousel needs it applied here. */
   .product-information__media .product-media-container,
   .product-information__media slideshow-slide {
+    border-radius: var(--media-radius, 0);
+    overflow: hidden;
+  }
+
+  /* The slide sits inside slideshow-slides, a scroll container that base.css leaves square, which
+     in turn sits inside slideshow-container. The outer two both clip, so a square level in the
+     middle of that chain is one more chance for a corner to be painted straight — round every
+     level at the same radius so the clip is the same shape all the way down. */
+  .product-information__media slideshow-slides {
+    border-radius: var(--media-radius, 0);
+  }
+
+  /* Rounding the slide only rounds the photo while the photo fills it. With
+     `constrain_to_viewport` on, base.css caps the media at `100vh - header`, and on a short
+     desktop window the photo comes out narrower than its track — 552 wide inside a 588 slide at
+     800px tall — with `.product-media-constraint-wrapper` centring it. The slide's corners are
+     then curving through a white margin nobody can see, and the square-cornered photo is what
+     reads as the image. Carry the radius down to the constrained box so the corner always
+     follows the picture, whatever the window height. */
+  .product-information__media .product-media-constraint-wrapper,
+  .product-information__media .product-media,
+  .product-information__media .product-media__image {
     border-radius: var(--media-radius, 0);
     overflow: hidden;
   }
